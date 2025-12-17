@@ -1,0 +1,25 @@
+version: '3.8'
+
+services:
+  api-gateway:
+    build:
+      context: ./api-gateway
+      dockerfile: Dockerfile
+      target: base
+    command: npm run start:dev
+    volumes:
+      - ./api-gateway:/app
+      - /app/node_modules
+    environment:
+      - NODE_ENV=development
+      - PORT=3000
+      - DATABASE_HOST=postgres
+      - DATABASE_PORT=5432
+      - DATABASE_USER=ecom_user
+      - DATABASE_PASSWORD=ecom_password
+      - DATABASE_NAME=ecom_db
+      - REDIS_HOST=redis
+      - REDIS_PORT=6379
+      - JWT_SECRET=your-super-secret-jwt-key-change-in-production
+      - JWT_EXPIRATION=7d
+
