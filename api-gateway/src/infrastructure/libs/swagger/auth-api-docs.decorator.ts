@@ -1,6 +1,6 @@
 import { applyDecorators } from '@nestjs/common';
 import { ApiOperation, ApiResponse, ApiBearerAuth } from '@nestjs/swagger';
-import type { AuthResponseDto } from '../../../../domain/dto/auth/auth-response.dto';
+import { AuthResponseDto } from '../../../domain/dto/auth/auth-response.dto';
 
 export const ApiRegister = () =>
   applyDecorators(

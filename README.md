@@ -1,6 +1,19 @@
 # E-Commerce Platform
 
-Hybrid e-commerce platform with Nest.js API Gateway and Laravel Admin Panel.
+Hybrid e-commerce platform with Nest.js API Gateway and Laravel Admin Panel. Built with Clean Architecture principles, featuring JWT authentication, role-based access control, and shared authentication between services.
+
+## 📑 Quick Navigation
+
+| Section | Description |
+|---------|-------------|
+| [NestJS Architecture](#nestjs-clean-architecture-overview) | Clean architecture structure and layer responsibilities |
+| [Quick Start](#quick-start) | Setup and running instructions |
+| [API Documentation](#api-documentation) | Complete API endpoints for Nest.js and Laravel |
+| [Authentication Flow](#authentication-flow) | JWT token sharing and usage |
+| [Error Handling](#error-handling) | Global error handling and validation |
+| [Validation](#validation) | DTO validation rules |
+| [Authentication & Authorization](#authentication--authorization) | Guards, roles, and token management |
+| [Development](#development) | Local development setup |
 
 ## Architecture
 
@@ -11,152 +24,47 @@ Hybrid e-commerce platform with Nest.js API Gateway and Laravel Admin Panel.
 
 ## NestJS Clean Architecture Overview
 
-The Nest.js API Gateway follows **Clean Architecture** principles, ensuring separation of concerns, testability, and maintainability. The codebase is organized into three main layers:
+The Nest.js API Gateway follows **Clean Architecture** principles with three main layers:
 
 ### 📁 Project Structure
 
 ```
 api-gateway/src/
-├── domain/                    # 🎯 Domain Layer (Business Logic)
-│   ├── entities/              # Database entities (User, Product, Order, etc.)
-│   │   ├── baseEntity.ts      # Base entity with common fields (id, timestamps)
-│   │   └── user.entity.ts     # User entity with business rules
-│   └── dto/                   # Data Transfer Objects (Request/Response models)
-│       └── auth/
-│           ├── register.dto.ts
-│           ├── login.dto.ts
-│           ├── auth-response.dto.ts
-│           └── refresh-token.dto.ts
-│
-├── application/                # 📡 Application Layer (Use Cases)
-│   └── controllers/           # HTTP Controllers (thin layer, only routing)
-│       ├── auth/
-│       │   └── auth.controller.ts
-│       └── user/
-│           └── user.controller.ts
-│
-└── infrastructure/            # 🔧 Infrastructure Layer (Technical Details)
-    ├── services/              # Business Services (called by controllers)
-    │   └── auth/
-    │       └── auth.service.ts
-    ├── authentication/        # JWT & Passport Configuration
-    │   ├── jwt.strategy.ts    # JWT validation strategy
-    │   └── auth.module.ts     # Authentication module
-    ├── cache/                 # Redis Caching
-    │   ├── redis.service.ts
-    │   └── redis.module.ts
-    ├── persistence/           # Database Layer
-    │   ├── database.module.ts
-    │   ├── data-source.ts
-    │   ├── migrations/        # TypeORM migrations
-    │   └── seeders/           # Database seeders
-    └── libs/                  # Helper Classes & Utilities
-        ├── guards/            # Authentication & Authorization guards
-        │   ├── jwt-auth.guard.ts
-        │   └── roles.guard.ts
-        ├── decorators/        # Custom decorators
-        │   ├── public.decorator.ts
-        │   ├── roles.decorator.ts
-        │   └── current-user.decorator.ts
-        ├── filters/           # Exception filters
-        │   └── http-exception.filter.ts
-        └── swagger/           # Swagger API documentation decorators
-            ├── api-docs.decorator.ts
-            ├── auth-api-docs.decorator.ts
-            └── user-api-docs.decorator.ts
+├── domain/              # Business logic (entities, DTOs)
+├── application/         # Controllers only (thin routing layer)
+└── infrastructure/      # Services, auth, cache, database, helpers
 ```
 
 ### 🎯 Layer Responsibilities
 
-#### 1. Domain Layer (`domain/`)
-**Purpose**: Contains business logic and core entities. No framework dependencies.
+**1. Domain Layer** (`domain/`)
+- **Entities**: Database models (User, Product, Order) with business rules
+- **DTOs**: Request/response validation models (RegisterDto, LoginDto, etc.)
+- **No framework dependencies** - pure business logic
 
-The Domain Layer is the innermost layer and represents the core business logic of the application. It contains:
+**2. Application Layer** (`application/`)
+- **Controllers**: HTTP endpoints that route requests to services
+- **Thin layer** - no business logic, only routing
 
-- **Entities** (`domain/entities/`): Database models that represent business objects like User, Product, Order, etc. These entities contain business rules and validation logic. They define the structure and behavior of core business concepts.
-
-- **DTOs** (`domain/dto/`): Data Transfer Objects that define the shape of data flowing in and out of the application. These include request DTOs (like RegisterDto, LoginDto) and response DTOs (like AuthResponseDto). They contain validation rules using class-validator decorators.
-
-This layer has no dependencies on external frameworks or libraries. It's pure business logic that could theoretically be used with any framework or even in a different language.
-
-#### 2. Application Layer (`application/`)
-**Purpose**: Thin layer containing only controllers. Handles HTTP requests/responses.
-
-The Application Layer is a thin orchestration layer that coordinates between HTTP requests and business services. It contains:
-
-- **Controllers** (`application/controllers/`): HTTP controllers that receive incoming requests, validate input using DTOs from the domain layer, call appropriate services from the infrastructure layer, and return responses. Controllers are kept thin - they don't contain business logic, only routing and request/response handling.
-
-Controllers delegate all business logic to services in the infrastructure layer. They act as a bridge between the HTTP world and the business logic world.
-
-#### 3. Infrastructure Layer (`infrastructure/`)
-**Purpose**: All technical implementations and external services.
-
-The Infrastructure Layer contains all the technical details and external service integrations. It's organized into several sub-folders:
-
-**Services** (`infrastructure/services/`):
-Contains business services that implement the actual application logic. These services are called by controllers and handle operations like user registration, authentication, product management, etc. Services use repositories, cache, and other infrastructure components to perform their work.
-
-**Authentication** (`infrastructure/authentication/`):
-Handles JWT token validation and Passport.js strategy configuration. This includes the JWT strategy that validates tokens, extracts user information, and checks token blacklists. The authentication module configures JWT signing and validation.
-
-**Cache** (`infrastructure/cache/`):
-Manages Redis caching operations. This includes caching data for performance and maintaining token blacklists for logout functionality. The cache service provides methods to get, set, delete, and reset cached data.
-
-**Persistence** (`infrastructure/persistence/`):
-Handles all database-related operations. This includes TypeORM configuration, database connection setup, migrations for schema changes, and seeders for initial data. The persistence layer abstracts database operations from the rest of the application.
-
-**Libs** (`infrastructure/libs/`):
-Contains reusable helper classes and utilities:
-- **Guards**: Protect routes by checking authentication (JWT) and authorization (roles). They run before controllers and can block unauthorized requests.
-- **Decorators**: Custom decorators that add metadata to controllers and methods. Examples include `@Public()` to mark routes as public, `@Roles()` to specify required roles, and `@CurrentUser()` to inject the authenticated user.
-- **Filters**: Global exception filters that catch and format all errors consistently across the application.
-- **Swagger**: API documentation decorators separated from controllers to keep controllers clean. These decorators generate Swagger/OpenAPI documentation.
+**3. Infrastructure Layer** (`infrastructure/`)
+- **Services**: Business logic implementation (AuthService, ProductService)
+- **Authentication**: JWT strategy and token validation
+- **Cache**: Redis for caching and token blacklisting
+- **Persistence**: TypeORM configuration, migrations, seeders
+- **Libs**: Guards, decorators, filters, Swagger decorators
 
 ### 🔄 Data Flow
 
 ```
-HTTP Request
-    ↓
-[Application Layer] Controllers
-    ↓
-[Infrastructure Layer] Services
-    ↓
-[Infrastructure Layer] Repositories/Cache
-    ↓
-[Domain Layer] Entities
-    ↓
-Database/Redis
+HTTP Request → Controllers → Services → Database/Redis
 ```
 
-### ✅ Benefits of This Architecture
+### ✅ Benefits
 
-1. **Separation of Concerns**: Each layer has a single responsibility
-2. **Testability**: Easy to mock dependencies and test in isolation
-3. **Maintainability**: Changes in one layer don't affect others
-4. **Scalability**: Easy to add new features without breaking existing code
-5. **Framework Independence**: Domain layer can be reused with different frameworks
-6. **Clear Dependencies**: Dependencies flow inward (Infrastructure → Application → Domain)
-
-### 📝 Key Principles
-
-- **Dependency Rule**: Inner layers (Domain) don't depend on outer layers (Infrastructure)
-- **Single Responsibility**: Each class/module has one reason to change
-- **Interface Segregation**: Services expose only what controllers need
-- **Open/Closed**: Open for extension, closed for modification
-
-### 🎓 Understanding the Structure
-
-**For New Developers**:
-1. Start with `application/controllers/` to see available endpoints
-2. Follow controllers to `infrastructure/services/` to understand business logic
-3. Check `domain/entities/` to see data models
-4. Review `infrastructure/libs/` for reusable utilities
-
-**For Reviewers**:
-- Controllers are in `application/` (thin layer)
-- Business logic is in `infrastructure/services/`
-- Data models are in `domain/entities/`
-- All technical details are in `infrastructure/`
+- **Separation of Concerns**: Each layer has one responsibility
+- **Testability**: Easy to mock and test in isolation
+- **Maintainability**: Changes don't affect other layers
+- **Scalability**: Easy to add new features
 
 ## Quick Start
 
@@ -325,15 +233,15 @@ Authorization: Bearer <access_token>
 
 ---
 
-### Laravel Admin Panel
+### Laravel Admin Panel API
 
-Base URL: `http://localhost:8000`
+Base URL: `http://localhost:8000/api`
 
 #### Admin Authentication Endpoints
 
 ##### Admin Login
 
-**POST** `/admin/login`
+**POST** `/api/admin/login`
 
 Login to the admin panel. Only users with `role = 'admin'` can access.
 
@@ -345,10 +253,15 @@ Login to the admin panel. Only users with `role = 'admin'` can access.
 }
 ```
 
+**Validation Rules:**
+- `email`: Valid email address (required)
+- `password`: Minimum 6 characters (required)
+
 **Response (200):**
 ```json
 {
   "accessToken": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...",
+  "refreshToken": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...",
   "user": {
     "id": "uuid",
     "email": "admin@gmail.com",
@@ -362,21 +275,55 @@ Login to the admin panel. Only users with `role = 'admin'` can access.
 **Error Responses:**
 - `400`: Validation error
 - `401`: Invalid credentials
-- `403`: User is not an admin
+- `403`: Account is inactive or user is not an admin
 
-**Note**: This token can also be used with Nest.js API endpoints.
+**Note**: This token can also be used with Nest.js API endpoints. Both services share the same JWT secret.
+
+---
+
+##### Refresh Token
+
+**POST** `/api/admin/refresh`
+
+Refresh the access token using a refresh token.
+
+**Request Body:**
+```json
+{
+  "refreshToken": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
+}
+```
+
+**Response (200):**
+```json
+{
+  "accessToken": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...",
+  "refreshToken": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
+}
+```
+
+**Error Responses:**
+- `400`: Validation error
+- `401`: Invalid or revoked refresh token
 
 ---
 
 ##### Admin Logout
 
-**POST** `/admin/logout`
+**POST** `/api/admin/logout`
 
-Logout from admin panel.
+Logout from admin panel and invalidate tokens.
 
 **Headers:**
 ```
 Authorization: Bearer <access_token>
+```
+
+**Request Body (optional):**
+```json
+{
+  "refreshToken": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
+}
 ```
 
 **Response (200):**
@@ -386,11 +333,14 @@ Authorization: Bearer <access_token>
 }
 ```
 
+**Error Responses:**
+- `401`: Unauthorized
+
 ---
 
 ##### Get Current Admin User
 
-**GET** `/admin/user`
+**GET** `/api/admin/user`
 
 Get the currently authenticated admin user.
 

@@ -33,20 +33,27 @@ class AppServiceProvider extends ServiceProvider
 
     /**
      * Ensure admin user exists (runs once per application lifecycle)
+     * Matches NestJS AdminSeeder implementation
      */
     private function ensureAdminExists(): void
     {
-        $adminEmail = 'admin@gmail.com';
-        $cacheKey = 'admin_user_exists';
-        
-        $adminExists = Cache::remember($cacheKey, 3600, function () use ($adminEmail) {
-            return User::where('email', $adminEmail)->exists();
-        });
-        
-        if (! $adminExists) {
-            $seeder = new AdminSeeder();
-            $seeder->run();
-            Cache::put($cacheKey, true, 3600);
+        try {
+            $adminEmail = 'admin@gmail.com';
+            $cacheKey = 'admin_user_exists';
+            
+            $adminExists = Cache::remember($cacheKey, 3600, function () use ($adminEmail) {
+                return User::where('email', $adminEmail)->exists();
+            });
+            
+            if (! $adminExists) {
+                $seeder = new AdminSeeder();
+                $seeder->run();
+                Cache::put($cacheKey, true, 3600);
+            }
+        } catch (\Exception $e) {
+            // Log error but don't crash the app
+            \Log::warning('Admin seeding failed: ' . $e->getMessage());
+            // Admin can be seeded manually via: php artisan db:seed --class=AdminSeeder
         }
     }
 }

@@ -74,6 +74,8 @@ services:
       - QUEUE_CONNECTION=redis
       - SESSION_DRIVER=redis
       - JWT_SECRET=your-super-secret-jwt-key-change-in-production
+      - JWT_EXPIRATION=1h
+      - JWT_REFRESH_EXPIRATION=7d
     volumes:
       - admin_storage:/var/www/html/storage
     depends_on:

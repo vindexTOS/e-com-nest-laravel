@@ -1,10 +1,7 @@
 import { Controller, Post, Body, HttpCode, HttpStatus, UseGuards, Req } from '@nestjs/common';
 import type { Request } from 'express';
 import { AuthService } from '../../../infrastructure/services/auth/auth.service';
-import { RegisterDto } from '../../../domain/dto/auth/register.dto';
-import { LoginDto } from '../../../domain/dto/auth/login.dto';
-import { RefreshTokenDto } from '../../../domain/dto/auth/refresh-token.dto';
-import { AuthResponseDto } from '../../../domain/dto/auth/auth-response.dto';
+import { RegisterDto, LoginDto, RefreshTokenDto, AuthResponseDto } from '../../../domain/dto/auth';
 import { JwtAuthGuard } from '../../../infrastructure/libs/guards/jwt-auth.guard';
 import { Public } from '../../../infrastructure/libs/decorators/public.decorator';
 import { ApiController } from '../../../infrastructure/libs/swagger/api-docs.decorator';

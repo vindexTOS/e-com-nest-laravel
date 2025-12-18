@@ -5,9 +5,7 @@ import { JwtService } from '@nestjs/jwt';
 import { ConfigService } from '@nestjs/config';
 import * as bcrypt from 'bcrypt';
 import { User, UserRole } from '../../../domain/entities/user.entity';
-import { RegisterDto } from '../../../domain/dto/auth/register.dto';
-import { LoginDto } from '../../../domain/dto/auth/login.dto';
-import { AuthResponseDto } from '../../../domain/dto/auth/auth-response.dto';
+import { RegisterDto, LoginDto, AuthResponseDto } from '../../../domain/dto/auth';
 import { JwtPayload } from '../../authentication/jwt.strategy';
 import { RedisService } from '../../cache/redis.service';
 

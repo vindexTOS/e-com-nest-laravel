@@ -2,7 +2,7 @@ import { Controller, Get, UseGuards } from '@nestjs/common';
 import { JwtAuthGuard } from '../../../infrastructure/libs/guards/jwt-auth.guard';
 import { RolesGuard } from '../../../infrastructure/libs/guards/roles.guard';
 import { Roles } from '../../../infrastructure/libs/decorators/roles.decorator';
-import { CurrentUser, CurrentUserPayload } from '../../../infrastructure/libs/decorators/current-user.decorator';
+import { CurrentUser, type CurrentUserPayload } from '../../../infrastructure/libs/decorators/current-user.decorator';
 import { UserRole } from '../../../domain/entities/user.entity';
 import { ApiController } from '../../../infrastructure/libs/swagger/api-docs.decorator';
 import { ApiGetProfile, ApiGetAllUsers } from '../../../infrastructure/libs/swagger/user-api-docs.decorator';
