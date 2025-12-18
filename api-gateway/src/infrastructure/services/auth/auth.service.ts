@@ -1,0 +1,159 @@
+import { Injectable, UnauthorizedException, ConflictException } from '@nestjs/common';
+import { InjectRepository } from '@nestjs/typeorm';
+import { Repository } from 'typeorm';
+import { JwtService } from '@nestjs/jwt';
+import { ConfigService } from '@nestjs/config';
+import * as bcrypt from 'bcrypt';
+import { User, UserRole } from '../../../domain/entities/user.entity';
+import { RegisterDto } from '../../../domain/dto/auth/register.dto';
+import { LoginDto } from '../../../domain/dto/auth/login.dto';
+import { AuthResponseDto } from '../../../domain/dto/auth/auth-response.dto';
+import { JwtPayload } from '../../authentication/jwt.strategy';
+import { RedisService } from '../../cache/redis.service';
+
+@Injectable()
+export class AuthService {
+  constructor(
+    @InjectRepository(User)
+    private userRepository: Repository<User>,
+    private jwtService: JwtService,
+    private configService: ConfigService,
+    private redisService: RedisService,
+  ) {}
+
+  async register(registerDto: RegisterDto): Promise<AuthResponseDto> {
+    const existingUser = await this.userRepository.findOne({
+      where: { email: registerDto.email },
+    });
+
+    if (existingUser) {
+      throw new ConflictException('Email already exists');
+    }
+
+    const hashedPassword = await bcrypt.hash(registerDto.password, 10);
+
+    const user = this.userRepository.create({
+      email: registerDto.email,
+      password: hashedPassword,
+      firstName: registerDto.firstName,
+      lastName: registerDto.lastName,
+      phone: registerDto.phone,
+      role: UserRole.CUSTOMER,
+      isActive: true,
+    });
+
+    const savedUser = await this.userRepository.save(user);
+
+    return this.generateTokens(savedUser);
+  }
+
+  async login(loginDto: LoginDto): Promise<AuthResponseDto> {
+    const user = await this.userRepository.findOne({
+      where: { email: loginDto.email },
+    });
+
+    if (!user) {
+      throw new UnauthorizedException('Invalid credentials');
+    }
+
+    if (!user.isActive) {
+      throw new UnauthorizedException('Account is inactive');
+    }
+
+    const isPasswordValid = await bcrypt.compare(loginDto.password, user.password);
+
+    if (!isPasswordValid) {
+      throw new UnauthorizedException('Invalid credentials');
+    }
+
+    return this.generateTokens(user);
+  }
+
+  async refreshToken(refreshToken: string): Promise<{ accessToken: string; refreshToken: string }> {
+    try {
+      const jwtSecret = this.configService.get<string>('JWT_SECRET') || 'your-super-secret-jwt-key-change-in-production';
+      const refreshSecret = this.configService.get<string>('JWT_REFRESH_SECRET') || jwtSecret;
+      const payload = this.jwtService.verify<JwtPayload>(refreshToken, {
+        secret: refreshSecret,
+      });
+
+      const isBlacklisted = await this.redisService.get<boolean>(`blacklist:${refreshToken}`);
+      if (isBlacklisted) {
+        throw new UnauthorizedException('Token has been revoked');
+      }
+
+      const user = await this.userRepository.findOne({
+        where: { id: payload.sub },
+      });
+
+      if (!user || !user.isActive) {
+        throw new UnauthorizedException('User not found or inactive');
+      }
+
+      return this.generateTokens(user);
+    } catch (error) {
+      throw new UnauthorizedException('Invalid refresh token');
+    }
+  }
+
+  async logout(accessToken: string, refreshToken?: string): Promise<void> {
+    try {
+      const accessPayload = this.jwtService.decode(accessToken) as JwtPayload;
+      const accessExp = accessPayload.exp ? accessPayload.exp * 1000 : Date.now() + 3600000;
+      const accessTtl = Math.floor((accessExp - Date.now()) / 1000);
+
+      if (accessTtl > 0) {
+        await this.redisService.set(`blacklist:${accessToken}`, true, accessTtl);
+      }
+
+      if (refreshToken) {
+        const refreshPayload = this.jwtService.decode(refreshToken) as JwtPayload;
+        const refreshExp = refreshPayload.exp ? refreshPayload.exp * 1000 : Date.now() + 604800000;
+        const refreshTtl = Math.floor((refreshExp - Date.now()) / 1000);
+
+        if (refreshTtl > 0) {
+          await this.redisService.set(`blacklist:${refreshToken}`, true, refreshTtl);
+        }
+      }
+    } catch (error) {
+      // Ignore errors during logout
+    }
+  }
+
+  private async generateTokens(user: User): Promise<AuthResponseDto> {
+    const payload: JwtPayload = {
+      sub: user.id,
+      email: user.email,
+      role: user.role,
+    };
+
+    const jwtSecret = this.configService.get<string>('JWT_SECRET') || 'your-super-secret-jwt-key-change-in-production';
+    const refreshSecret = this.configService.get<string>('JWT_REFRESH_SECRET') || jwtSecret;
+    const accessTokenExpiration = this.configService.get<string>('JWT_EXPIRATION') || '1h';
+    const refreshTokenExpiration = this.configService.get<string>('JWT_REFRESH_EXPIRATION') || '7d';
+
+    const [accessToken, refreshToken] = await Promise.all([
+      this.jwtService.signAsync(payload, {
+        secret: jwtSecret,
+        expiresIn: accessTokenExpiration,
+      }),
+      this.jwtService.signAsync(payload, {
+        secret: refreshSecret,
+        expiresIn: refreshTokenExpiration,
+      }),
+    ]);
+
+    return {
+      accessToken,
+      refreshToken,
+      user: {
+        id: user.id,
+        email: user.email,
+        firstName: user.firstName,
+        lastName: user.lastName,
+        role: user.role,
+      },
+    };
+  }
+}
+
