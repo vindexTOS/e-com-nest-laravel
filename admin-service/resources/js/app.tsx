@@ -8,11 +8,16 @@ import PublicRoute from './shared/components/PublicRoute';
 // Admin pages
 import AdminLogin from './admin/pages/AdminLogin';
 import AdminDashboard from './admin/pages/AdminDashboard';
+import ProductsPage from './admin/pages/ProductsPage';
+import CategoriesPage from './admin/pages/CategoriesPage';
+import OrdersPage from './admin/pages/OrdersPage';
+import UsersPage from './admin/pages/UsersPage';
+import ReportsPage from './admin/pages/ReportsPage';
 
 // User pages
 import UserLogin from './user/pages/UserLogin';
 import UserRegister from './user/pages/UserRegister';
-import ProductsPage from './user/pages/ProductsPage';
+import UserProductsPage from './user/pages/UserProductPage';
 
 import '../css/app.css';
 
@@ -30,7 +35,7 @@ const App: React.FC = () => {
                     {/* Public Routes - Products page with navbar */}
                     <Route
                         path="/"
-                        element={<ProductsPage />}
+                        element={<UserProductsPage />}
                     />
                     <Route
                         path="/login"
@@ -63,6 +68,46 @@ const App: React.FC = () => {
                         element={
                             <ProtectedRoute requiredRole="admin" redirectTo="/admin">
                                 <AdminDashboard />
+                            </ProtectedRoute>
+                        }
+                    />
+                    <Route
+                        path="/admin/products"
+                        element={
+                            <ProtectedRoute requiredRole="admin" redirectTo="/admin">
+                                <ProductsPage />
+                            </ProtectedRoute>
+                        }
+                    />
+                    <Route
+                        path="/admin/categories"
+                        element={
+                            <ProtectedRoute requiredRole="admin" redirectTo="/admin">
+                                <CategoriesPage />
+                            </ProtectedRoute>
+                        }
+                    />
+                    <Route
+                        path="/admin/orders"
+                        element={
+                            <ProtectedRoute requiredRole="admin" redirectTo="/admin">
+                                <OrdersPage />
+                            </ProtectedRoute>
+                        }
+                    />
+                    <Route
+                        path="/admin/users"
+                        element={
+                            <ProtectedRoute requiredRole="admin" redirectTo="/admin">
+                                <UsersPage />
+                            </ProtectedRoute>
+                        }
+                    />
+                    <Route
+                        path="/admin/reports"
+                        element={
+                            <ProtectedRoute requiredRole="admin" redirectTo="/admin">
+                                <ReportsPage />
                             </ProtectedRoute>
                         }
                     />

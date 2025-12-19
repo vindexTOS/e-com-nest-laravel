@@ -10,10 +10,195 @@ use Illuminate\Support\Facades\Validator;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Validation\ValidationException;
 use Illuminate\Http\JsonResponse;
+use OpenApi\Attributes as OA;
 
 class AuthController extends Controller
 {
+    #[OA\Post(
+        path: '/api/auth/register',
+        summary: 'Register a new user',
+        tags: ['Authentication'],
+        requestBody: new OA\RequestBody(
+            required: true,
+            content: new OA\JsonContent(
+                required: ['email', 'password', 'firstName', 'lastName'],
+                properties: [
+                    new OA\Property(property: 'email', type: 'string', format: 'email', example: 'user@example.com'),
+                    new OA\Property(property: 'password', type: 'string', format: 'password', example: 'password123', minLength: 6),
+                    new OA\Property(property: 'firstName', type: 'string', example: 'John'),
+                    new OA\Property(property: 'lastName', type: 'string', example: 'Doe'),
+                    new OA\Property(property: 'phone', type: 'string', nullable: true, example: '+1234567890'),
+                ]
+            )
+        ),
+        responses: [
+            new OA\Response(
+                response: 201,
+                description: 'User registered successfully',
+                content: new OA\JsonContent(
+                    properties: [
+                        new OA\Property(property: 'accessToken', type: 'string'),
+                        new OA\Property(property: 'refreshToken', type: 'string'),
+                        new OA\Property(property: 'user', type: 'object'),
+                    ]
+                )
+            ),
+            new OA\Response(response: 400, description: 'Validation error'),
+            new OA\Response(response: 409, description: 'Email already exists'),
+        ]
+    )]
+    public function register(Request $request): JsonResponse
+    {
+        $validator = Validator::make($request->all(), [
+            'email' => 'required|email|unique:users,email',
+            'password' => 'required|string|min:6',
+            'firstName' => 'required|string|max:255',
+            'lastName' => 'required|string|max:255',
+            'phone' => 'nullable|string|max:20',
+        ]);
+
+        if ($validator->fails()) {
+            return response()->json([
+                'statusCode' => 400,
+                'message' => 'Validation failed',
+                'errors' => $validator->errors(),
+            ], 400);
+        }
+
+        $user = User::create([
+            'email' => $request->email,
+            'password' => Hash::make($request->password),
+            'first_name' => $request->firstName,
+            'last_name' => $request->lastName,
+            'phone' => $request->phone,
+            'role' => 'customer',
+            'is_active' => true,
+            'email_verified_at' => now(),
+        ]);
+
+        $tokens = $this->generateTokens($user);
+
+        return response()->json([
+            'accessToken' => $tokens['accessToken'],
+            'refreshToken' => $tokens['refreshToken'],
+            'user' => [
+                'id' => $user->id,
+                'email' => $user->email,
+                'firstName' => $user->first_name,
+                'lastName' => $user->last_name,
+                'role' => $user->role,
+            ],
+        ], 201);
+    }
+
+    #[OA\Post(
+        path: '/api/auth/login',
+        summary: 'User login',
+        tags: ['Authentication'],
+        requestBody: new OA\RequestBody(
+            required: true,
+            content: new OA\JsonContent(
+                required: ['email', 'password'],
+                properties: [
+                    new OA\Property(property: 'email', type: 'string', format: 'email', example: 'user@example.com'),
+                    new OA\Property(property: 'password', type: 'string', format: 'password', example: 'password123'),
+                ]
+            )
+        ),
+        responses: [
+            new OA\Response(
+                response: 200,
+                description: 'Login successful',
+                content: new OA\JsonContent(
+                    properties: [
+                        new OA\Property(property: 'accessToken', type: 'string'),
+                        new OA\Property(property: 'refreshToken', type: 'string'),
+                        new OA\Property(property: 'user', type: 'object'),
+                    ]
+                )
+            ),
+            new OA\Response(response: 400, description: 'Validation error'),
+            new OA\Response(response: 401, description: 'Invalid credentials'),
+        ]
+    )]
     public function login(Request $request): JsonResponse
+    {
+        $validator = Validator::make($request->all(), [
+            'email' => 'required|email',
+            'password' => 'required|string|min:6',
+        ]);
+
+        if ($validator->fails()) {
+            return response()->json([
+                'statusCode' => 400,
+                'message' => 'Validation failed',
+                'errors' => $validator->errors(),
+            ], 400);
+        }
+
+        $user = User::where('email', $request->email)->first();
+
+        if (!$user || !Hash::check($request->password, $user->password)) {
+            return response()->json([
+                'statusCode' => 401,
+                'message' => 'Invalid credentials',
+            ], 401);
+        }
+
+        if (!$user->is_active) {
+            return response()->json([
+                'statusCode' => 403,
+                'message' => 'Account is inactive',
+            ], 403);
+        }
+
+        $tokens = $this->generateTokens($user);
+
+        return response()->json([
+            'accessToken' => $tokens['accessToken'],
+            'refreshToken' => $tokens['refreshToken'],
+            'user' => [
+                'id' => $user->id,
+                'email' => $user->email,
+                'firstName' => $user->first_name,
+                'lastName' => $user->last_name,
+                'role' => $user->role,
+            ],
+        ], 200);
+    }
+
+    #[OA\Post(
+        path: '/api/admin/login',
+        summary: 'Admin login',
+        tags: ['Admin Authentication'],
+        requestBody: new OA\RequestBody(
+            required: true,
+            content: new OA\JsonContent(
+                required: ['email', 'password'],
+                properties: [
+                    new OA\Property(property: 'email', type: 'string', format: 'email', example: 'admin@gmail.com'),
+                    new OA\Property(property: 'password', type: 'string', format: 'password', example: 'password123'),
+                ]
+            )
+        ),
+        responses: [
+            new OA\Response(
+                response: 200,
+                description: 'Login successful',
+                content: new OA\JsonContent(
+                    properties: [
+                        new OA\Property(property: 'accessToken', type: 'string'),
+                        new OA\Property(property: 'refreshToken', type: 'string'),
+                        new OA\Property(property: 'user', type: 'object'),
+                    ]
+                )
+            ),
+            new OA\Response(response: 400, description: 'Validation error'),
+            new OA\Response(response: 401, description: 'Invalid credentials'),
+            new OA\Response(response: 403, description: 'Admin access required'),
+        ]
+    )]
+    public function adminLogin(Request $request): JsonResponse
     {
         $validator = Validator::make($request->all(), [
             'email' => 'required|email',
@@ -66,6 +251,33 @@ class AuthController extends Controller
         ], 200);
     }
 
+    #[OA\Post(
+        path: '/api/auth/refresh',
+        summary: 'Refresh access token',
+        tags: ['Authentication'],
+        requestBody: new OA\RequestBody(
+            required: true,
+            content: new OA\JsonContent(
+                required: ['refreshToken'],
+                properties: [
+                    new OA\Property(property: 'refreshToken', type: 'string', example: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...'),
+                ]
+            )
+        ),
+        responses: [
+            new OA\Response(
+                response: 200,
+                description: 'Token refreshed successfully',
+                content: new OA\JsonContent(
+                    properties: [
+                        new OA\Property(property: 'accessToken', type: 'string'),
+                        new OA\Property(property: 'refreshToken', type: 'string'),
+                    ]
+                )
+            ),
+            new OA\Response(response: 401, description: 'Invalid refresh token'),
+        ]
+    )]
     public function refresh(Request $request): JsonResponse
     {
         $validator = Validator::make($request->all(), [
@@ -123,6 +335,24 @@ class AuthController extends Controller
         }
     }
 
+    #[OA\Post(
+        path: '/api/auth/logout',
+        summary: 'Logout and invalidate tokens',
+        tags: ['Authentication'],
+        security: [['bearerAuth' => []]],
+        requestBody: new OA\RequestBody(
+            required: false,
+            content: new OA\JsonContent(
+                properties: [
+                    new OA\Property(property: 'refreshToken', type: 'string', nullable: true),
+                ]
+            )
+        ),
+        responses: [
+            new OA\Response(response: 200, description: 'Logged out successfully'),
+            new OA\Response(response: 401, description: 'Unauthorized'),
+        ]
+    )]
     public function logout(Request $request): JsonResponse
     {
         try {
@@ -159,6 +389,29 @@ class AuthController extends Controller
         }
     }
 
+    #[OA\Get(
+        path: '/api/admin/user',
+        summary: 'Get authenticated admin user',
+        tags: ['Admin'],
+        security: [['bearerAuth' => []]],
+        responses: [
+            new OA\Response(
+                response: 200,
+                description: 'User information',
+                content: new OA\JsonContent(
+                    properties: [
+                        new OA\Property(property: 'id', type: 'string', format: 'uuid'),
+                        new OA\Property(property: 'email', type: 'string'),
+                        new OA\Property(property: 'firstName', type: 'string'),
+                        new OA\Property(property: 'lastName', type: 'string'),
+                        new OA\Property(property: 'role', type: 'string'),
+                        new OA\Property(property: 'isActive', type: 'boolean'),
+                    ]
+                )
+            ),
+            new OA\Response(response: 401, description: 'Unauthorized'),
+        ]
+    )]
     public function user(Request $request): JsonResponse
     {
         $user = $request->user();

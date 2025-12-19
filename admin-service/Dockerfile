@@ -23,11 +23,11 @@ COPY --from=composer:latest /usr/bin/composer /usr/bin/composer
 
 FROM base AS dependencies
 
-COPY composer.json composer.lock ./
-RUN composer install --no-dev --optimize-autoloader --no-interaction --prefer-dist --no-scripts
+COPY composer.json ./
+RUN composer update --no-dev --optimize-autoloader --no-interaction --prefer-dist --no-scripts --ignore-platform-reqs
 
 COPY package.json package-lock.json* ./
-RUN npm ci
+RUN npm ci --legacy-peer-deps || npm install
 
 FROM base AS build
 
@@ -40,10 +40,11 @@ RUN rm -rf bootstrap/cache/*.php \
     && mkdir -p bootstrap/cache \
     && composer dump-autoload --optimize --no-interaction \
     && php artisan package:discover --ansi || true \
-    && php -r "if(file_exists('bootstrap/cache/packages.php')) { \$packages = require 'bootstrap/cache/packages.php'; \$devPackages = ['laravel/pail', 'laravel/sail', 'nunomaduro/collision', 'nunomaduro/termwind']; \$filtered = array_diff_key(\$packages, array_flip(\$devPackages)); file_put_contents('bootstrap/cache/packages.php', '<?php return ' . var_export(\$filtered, true) . ';'); }" \
-    && php artisan config:cache || true
+    && php -r "if(file_exists('bootstrap/cache/packages.php')) { \$packages = require 'bootstrap/cache/packages.php'; \$devPackages = ['laravel/pail', 'laravel/sail', 'nunomaduro/collision', 'nunomaduro/termwind']; \$filtered = array_diff_key(\$packages, array_flip(\$devPackages)); file_put_contents('bootstrap/cache/packages.php', '<?php return ' . var_export(\$filtered, true) . ';'); }"
 
-RUN npm run build
+# Always rebuild frontend assets
+# Force rebuild frontend assets - remove old build first
+RUN rm -rf public/build && npm run build || (npm install && npm run build)
 
 FROM php:8.5-fpm-alpine AS production
 
@@ -91,4 +92,4 @@ RUN chown -R www-data:www-data /var/www/html \
 
 EXPOSE 8000
 
-CMD sh -c "if [ ! -f /var/www/html/.env ]; then echo 'APP_KEY=base64:uQsffUPbReVqWhDDhrx5FsduqgPKg3JiZQ98MAuKBX4=' > /var/www/html/.env; fi && php artisan config:clear && php artisan serve --host=0.0.0.0 --port=8000"
+CMD sh -c "php artisan config:clear && php artisan cache:clear && rm -f /var/www/html/bootstrap/cache/config.php && php artisan storage:link || true && php artisan serve --host=0.0.0.0 --port=8000"

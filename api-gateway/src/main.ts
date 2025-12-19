@@ -7,8 +7,6 @@ import { HttpExceptionFilter } from './infrastructure/libs/filters/http-exceptio
 async function bootstrap() {
   const app = await NestFactory.create(AppModule);
 
-  app.setGlobalPrefix('api');
-  
   app.useGlobalFilters(new HttpExceptionFilter());
   
   app.useGlobalPipes(
@@ -29,8 +27,10 @@ async function bootstrap() {
     .addBearerAuth()
     .build();
 
+  app.setGlobalPrefix('api/gateway');
+  
   const document = SwaggerModule.createDocument(app, config);
-  SwaggerModule.setup('api/docs', app, document);
+  SwaggerModule.setup('docs', app, document);
 
   await app.listen(process.env.PORT ?? 3000);
 }

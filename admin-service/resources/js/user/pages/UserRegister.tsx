@@ -2,13 +2,8 @@ import React, { useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { Form, Input, Button, Card, message, Typography } from 'antd';
 import { UserOutlined, LockOutlined, MailOutlined, PhoneOutlined } from '@ant-design/icons';
-import axios from 'axios';
+import { laravelAuthApi } from '../../api';
 import { useAuth } from '../../shared/hooks/useAuth';
-import { LoginResponse } from '../../shared/types/auth.types';
-
-axios.defaults.baseURL = window.location.origin;
-axios.defaults.headers.common['Content-Type'] = 'application/json';
-axios.defaults.headers.common['Accept'] = 'application/json';
 
 const { Title, Text } = Typography;
 
@@ -30,7 +25,7 @@ const UserRegister: React.FC = () => {
     const onFinish = async (values: RegisterFormValues) => {
         setLoading(true);
         try {
-            const response = await axios.post<LoginResponse>('/api/auth/register', {
+            const response = await laravelAuthApi.register({
                 email: values.email,
                 password: values.password,
                 firstName: values.firstName,
@@ -38,12 +33,12 @@ const UserRegister: React.FC = () => {
                 phone: values.phone,
             });
 
-            if (response.data.accessToken) {
+            if (response.accessToken) {
                 message.success('Registration successful!');
                 login(
-                    response.data.accessToken,
-                    response.data.refreshToken,
-                    response.data.user
+                    response.accessToken,
+                    response.refreshToken,
+                    response.user
                 );
                 navigate('/', { replace: true });
             }

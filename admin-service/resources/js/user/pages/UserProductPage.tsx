@@ -7,7 +7,7 @@ import { useNavigate, Link } from 'react-router-dom';
 const { Header, Content } = Layout;
 const { Title } = Typography;
 
-const ProductsPage: React.FC = () => {
+const UserProductsPage: React.FC = () => {
     const { logout, user, isAuthenticated, loading } = useAuth();
     const navigate = useNavigate();
 
@@ -127,5 +127,5 @@ const ProductsPage: React.FC = () => {
     );
 };
 
-export default ProductsPage;
+export default UserProductsPage;
 

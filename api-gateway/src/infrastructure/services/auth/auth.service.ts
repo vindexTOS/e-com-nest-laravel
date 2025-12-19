@@ -5,9 +5,9 @@ import { JwtService } from '@nestjs/jwt';
 import { ConfigService } from '@nestjs/config';
 import * as bcrypt from 'bcrypt';
 import { User, UserRole } from '../../../domain/entities/user.entity';
-import { RegisterDto, LoginDto, AuthResponseDto } from '../../../domain/dto/auth';
 import { JwtPayload } from '../../authentication/jwt.strategy';
 import { RedisService } from '../../cache/redis.service';
+import { RegisterDto, LoginDto } from '../../../domain/dto/auth';
 
 @Injectable()
 export class AuthService {
@@ -19,7 +19,7 @@ export class AuthService {
     private redisService: RedisService,
   ) {}
 
-  async register(registerDto: RegisterDto): Promise<AuthResponseDto> {
+  async register(registerDto: RegisterDto): Promise<{ accessToken: string; refreshToken: string; user: { id: string; email: string; firstName: string; lastName: string; role: string } }> {
     const existingUser = await this.userRepository.findOne({
       where: { email: registerDto.email },
     });
@@ -38,14 +38,15 @@ export class AuthService {
       phone: registerDto.phone,
       role: UserRole.CUSTOMER,
       isActive: true,
+      emailVerifiedAt: new Date(),
     });
 
-    const savedUser = await this.userRepository.save(user);
+    await this.userRepository.save(user);
 
-    return this.generateTokens(savedUser);
+    return this.generateTokens(user);
   }
 
-  async login(loginDto: LoginDto): Promise<AuthResponseDto> {
+  async login(loginDto: LoginDto): Promise<{ accessToken: string; refreshToken: string; user: { id: string; email: string; firstName: string; lastName: string; role: string } }> {
     const user = await this.userRepository.findOne({
       where: { email: loginDto.email },
     });
@@ -54,14 +55,13 @@ export class AuthService {
       throw new UnauthorizedException('Invalid credentials');
     }
 
-    if (!user.isActive) {
-      throw new UnauthorizedException('Account is inactive');
-    }
-
     const isPasswordValid = await bcrypt.compare(loginDto.password, user.password);
-
     if (!isPasswordValid) {
       throw new UnauthorizedException('Invalid credentials');
+    }
+
+    if (!user.isActive) {
+      throw new UnauthorizedException('Account is inactive');
     }
 
     return this.generateTokens(user);
@@ -88,37 +88,17 @@ export class AuthService {
         throw new UnauthorizedException('User not found or inactive');
       }
 
-      return this.generateTokens(user);
+      const tokens = await this.generateTokens(user);
+      return {
+        accessToken: tokens.accessToken,
+        refreshToken: tokens.refreshToken,
+      };
     } catch (error) {
       throw new UnauthorizedException('Invalid refresh token');
     }
   }
 
-  async logout(accessToken: string, refreshToken?: string): Promise<void> {
-    try {
-      const accessPayload = this.jwtService.decode(accessToken) as JwtPayload;
-      const accessExp = accessPayload.exp ? accessPayload.exp * 1000 : Date.now() + 3600000;
-      const accessTtl = Math.floor((accessExp - Date.now()) / 1000);
-
-      if (accessTtl > 0) {
-        await this.redisService.set(`blacklist:${accessToken}`, true, accessTtl);
-      }
-
-      if (refreshToken) {
-        const refreshPayload = this.jwtService.decode(refreshToken) as JwtPayload;
-        const refreshExp = refreshPayload.exp ? refreshPayload.exp * 1000 : Date.now() + 604800000;
-        const refreshTtl = Math.floor((refreshExp - Date.now()) / 1000);
-
-        if (refreshTtl > 0) {
-          await this.redisService.set(`blacklist:${refreshToken}`, true, refreshTtl);
-        }
-      }
-    } catch (error) {
-      // Ignore errors during logout
-    }
-  }
-
-  private async generateTokens(user: User): Promise<AuthResponseDto> {
+  async generateTokens(user: User): Promise<{ accessToken: string; refreshToken: string; user: { id: string; email: string; firstName: string; lastName: string; role: string } }> {
     const payload: JwtPayload = {
       sub: user.id,
       email: user.email,
@@ -152,6 +132,30 @@ export class AuthService {
         role: user.role,
       },
     };
+  }
+
+  async logout(accessToken: string, refreshToken?: string): Promise<void> {
+    try {
+      const accessPayload = this.jwtService.decode(accessToken) as JwtPayload;
+      const accessExp = accessPayload.exp ? accessPayload.exp * 1000 : Date.now() + 3600000;
+      const accessTtl = Math.floor((accessExp - Date.now()) / 1000);
+
+      if (accessTtl > 0) {
+        await this.redisService.set(`blacklist:${accessToken}`, true, accessTtl);
+      }
+
+      if (refreshToken) {
+        const refreshPayload = this.jwtService.decode(refreshToken) as JwtPayload;
+        const refreshExp = refreshPayload.exp ? refreshPayload.exp * 1000 : Date.now() + 604800000;
+        const refreshTtl = Math.floor((refreshExp - Date.now()) / 1000);
+
+        if (refreshTtl > 0) {
+          await this.redisService.set(`blacklist:${refreshToken}`, true, refreshTtl);
+        }
+      }
+    } catch (error) {
+      // Ignore errors during logout
+    }
   }
 }
 

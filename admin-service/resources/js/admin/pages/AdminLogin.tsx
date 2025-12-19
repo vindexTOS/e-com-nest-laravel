@@ -2,13 +2,8 @@ import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Form, Input, Button, Card, message, Typography } from 'antd';
 import { UserOutlined, LockOutlined } from '@ant-design/icons';
-import axios from 'axios';
+import { laravelAdminApi } from '../../api';
 import { useAuth } from '../../shared/hooks/useAuth';
-import { LoginResponse } from '../../shared/types/auth.types';
-
-axios.defaults.baseURL = window.location.origin;
-axios.defaults.headers.common['Content-Type'] = 'application/json';
-axios.defaults.headers.common['Accept'] = 'application/json';
 
 const { Title } = Typography;
 
@@ -26,17 +21,17 @@ const AdminLogin: React.FC = () => {
     const onFinish = async (values: LoginFormValues) => {
         setLoading(true);
         try {
-            const response = await axios.post<LoginResponse>('/api/admin/login', {
+            const response = await laravelAdminApi.login({
                 email: values.email,
                 password: values.password,
             });
 
-            if (response.data.accessToken && response.data.user.role === 'admin') {
+            if (response.accessToken && response.user.role === 'admin') {
                 message.success('Login successful!');
                 login(
-                    response.data.accessToken,
-                    response.data.refreshToken,
-                    response.data.user
+                    response.accessToken,
+                    response.refreshToken,
+                    response.user
                 );
                 navigate('/admin/dashboard', { replace: true });
             } else {
