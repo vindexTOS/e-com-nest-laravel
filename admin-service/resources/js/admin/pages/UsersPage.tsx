@@ -1,40 +1,76 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { Layout, Table, Button, Space, Input, Select, Card, Modal, Form, message, Tag, Popconfirm, Row, Col } from 'antd';
-import { PlusOutlined, EditOutlined, DeleteOutlined, SearchOutlined } from '@ant-design/icons';
-import { usersApi, User } from '../../api';
+import { PlusOutlined, EditOutlined, DeleteOutlined, UndoOutlined, SearchOutlined } from '@ant-design/icons';
+import { useMutation, useQueryClient } from '@tanstack/react-query';
+import { usersGql } from '../../graphql';
+import { User } from '../../types';
+import { io, Socket } from 'socket.io-client';
 import AdminLayout from '../components/AdminLayout';
 
 const { Content } = Layout;
 const { Option } = Select;
 
 const UsersPage: React.FC = () => {
-    const [users, setUsers] = useState<User[]>([]);
-    const [loading, setLoading] = useState(false);
+    const queryClient = useQueryClient();
     const [modalVisible, setModalVisible] = useState(false);
     const [editingUser, setEditingUser] = useState<User | null>(null);
     const [form] = Form.useForm();
-    const [filters, setFilters] = useState({ search: '', role: '', is_active: undefined });
+    const [filters, setFilters] = useState({ search: '', role: '', is_active: undefined, showDeleted: false });
     const [pagination, setPagination] = useState({ current: 1, pageSize: 15, total: 0 });
+    const [users, setUsers] = useState<User[]>([]);
+    const [loading, setLoading] = useState(false);
+    const socketRef = useRef<Socket | null>(null);
+    const total = pagination.total;
+
+    const requestUsers = (emitFilters = filters, emitPagination = pagination) => {
+        if (!socketRef.current) return;
+        setLoading(true);
+        socketRef.current.emit('users:get', {
+            search: emitFilters.search || undefined,
+            role: emitFilters.role || undefined,
+            page: emitPagination.current,
+            limit: emitPagination.pageSize,
+            withDeleted: emitFilters.showDeleted || undefined,
+        });
+    };
 
     useEffect(() => {
-        loadUsers();
-    }, [filters, pagination.current]);
+        const envUrl = (import.meta as any).env?.VITE_SOCKET_URL;
+        const defaultUrl = typeof window !== 'undefined' ? window.location.origin : 'http://localhost';
+        const socketUrl = (envUrl || defaultUrl).replace(/\/+$/, '');
+        const socket = io(`${socketUrl}/ws`, {
+            path: '/socket.io',
+            transports: ['websocket'],
+        });
+        socketRef.current = socket;
 
-    const loadUsers = async () => {
-        setLoading(true);
-        try {
-            const response = await usersApi.getAll({
-                ...filters,
-                per_page: pagination.pageSize,
-            });
-            setUsers(response.data.data || []);
-            setPagination(prev => ({ ...prev, total: response.data.total || 0 }));
-        } catch (error) {
-            message.error('Failed to load users');
-        } finally {
+        const handleUsersList = (payload: { data?: User[]; total?: number }) => {
+            setUsers(Array.isArray(payload?.data) ? payload.data : []);
+            setPagination(prev => ({ ...prev, total: payload?.total ?? prev.total }));
             setLoading(false);
-        }
-    };
+        };
+
+        socket.on('connect', () => {
+            requestUsers();
+        });
+        socket.on('users:list', handleUsersList);
+        socket.on('connect_error', (err) => {
+            console.error('Socket connection error', err);
+            setLoading(false);
+        });
+
+        return () => {
+            socket.off('users:list', handleUsersList);
+            socket.disconnect();
+            socketRef.current = null;
+        };
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, []);
+
+    useEffect(() => {
+        requestUsers();
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [filters, pagination.current, pagination.pageSize]);
 
     const handleCreate = () => {
         setEditingUser(null);
@@ -48,33 +84,42 @@ const UsersPage: React.FC = () => {
         setModalVisible(true);
     };
 
-    const handleDelete = async (id: string) => {
-        try {
-            await usersApi.delete(id);
+    const deleteUser = useMutation({
+        mutationFn: (id: string) => usersGql.delete(id),
+        onSuccess: async () => {
             message.success('User deleted successfully');
-            loadUsers();
-        } catch (error) {
-            message.error('Failed to delete user');
-        }
-    };
+            requestUsers();
+        },
+        onError: () => message.error('Failed to delete user'),
+    });
 
-    const handleSubmit = async (values: any) => {
-        try {
-            if (editingUser) {
-                await usersApi.update(editingUser.id, values);
-                message.success('User updated successfully');
-            } else {
-                await usersApi.create(values);
-                message.success('User created successfully');
-            }
+    const restoreUser = useMutation({
+        mutationFn: (id: string) => usersGql.restore(id),
+        onSuccess: async () => {
+            message.success('User restored successfully');
+            requestUsers();
+        },
+        onError: () => message.error('Failed to restore user'),
+    });
 
+    const saveUser = useMutation({
+        mutationFn: ({ id, values }: { id?: string; values: any }) => {
+            if (id) return usersGql.update(id, values);
+            return usersGql.create(values as any);
+        },
+        onSuccess: async (_res, vars) => {
+            message.success(vars.id ? 'User updated successfully' : 'User created successfully');
             setModalVisible(false);
+            setEditingUser(null);
             form.resetFields();
-            loadUsers();
-        } catch (error: any) {
-            message.error(error.response?.data?.message || 'Operation failed');
-        }
-    };
+            requestUsers();
+        },
+        onError: (error: any) => message.error(error.response?.data?.message || 'Operation failed'),
+    });
+
+    const handleDelete = (id: string) => deleteUser.mutate(id);
+    const handleRestore = (id: string) => restoreUser.mutate(id);
+    const handleSubmit = (values: any) => saveUser.mutate({ id: editingUser?.id, values });
 
     const columns = [
         {
@@ -111,9 +156,15 @@ const UsersPage: React.FC = () => {
             render: (_: any, record: User) => (
                 <Space>
                     <Button icon={<EditOutlined />} onClick={() => handleEdit(record)} />
+                    {(record as any).deletedAt || (record as any).deleted_at ? (
+                        <Popconfirm title="Restore this user?" onConfirm={() => handleRestore(record.id)}>
+                            <Button icon={<UndoOutlined />} />
+                        </Popconfirm>
+                    ) : (
                     <Popconfirm title="Delete this user?" onConfirm={() => handleDelete(record.id)}>
                         <Button danger icon={<DeleteOutlined />} />
                     </Popconfirm>
+                    )}
                 </Space>
             ),
         },
@@ -130,7 +181,7 @@ const UsersPage: React.FC = () => {
                                 prefix={<SearchOutlined />}
                                 value={filters.search}
                                 onChange={(e) => setFilters({ ...filters, search: e.target.value })}
-                                onPressEnter={loadUsers}
+                                onPressEnter={() => requestUsers()}
                             />
                         </Col>
                         <Col xs={24} sm={12} md={4}>
@@ -145,22 +196,14 @@ const UsersPage: React.FC = () => {
                                 <Option value="admin">Admin</Option>
                             </Select>
                         </Col>
-                        <Col xs={24} sm={12} md={4}>
-                            <Select
-                                placeholder="Status"
-                                allowClear
-                                value={filters.is_active !== undefined ? filters.is_active.toString() : undefined}
-                                onChange={(value) => setFilters({ ...filters, is_active: value !== undefined ? value === 'true' : undefined })}
-                                style={{ width: '100%' }}
-                            >
-                                <Option value="true">Active</Option>
-                                <Option value="false">Inactive</Option>
-                            </Select>
-                        </Col>
+                  
                         <Col xs={24} sm={12} md={8}>
                             <Space>
                                 <Button type="primary" icon={<PlusOutlined />} onClick={handleCreate}>
                                     Add User
+                                </Button>
+                                <Button onClick={() => setFilters({ ...filters, showDeleted: !filters.showDeleted })}>
+                                    {filters.showDeleted ? 'Show Active' : 'Show Deleted'}
                                 </Button>
                             </Space>
                         </Col>
@@ -173,6 +216,7 @@ const UsersPage: React.FC = () => {
                         rowKey="id"
                         pagination={{
                             ...pagination,
+                            total,
                             onChange: (page, pageSize) => setPagination({ ...pagination, current: page, pageSize }),
                         }}
                     />

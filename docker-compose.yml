@@ -9,11 +9,12 @@ services:
     depends_on:
       - api-gateway
       - admin-service
+      - soketi
     networks:
       - ecom-network
     restart: unless-stopped
 
-  # Nest.js 
+  # Nest.js API Gateway
   api-gateway:
     build:
       context: ./api-gateway
@@ -22,20 +23,38 @@ services:
     expose:
       - "3000"
     environment:
-      - NODE_ENV=production
-      - PORT=3000
-      - DATABASE_HOST=postgres
-      - DATABASE_PORT=5432
-      - DATABASE_USER=ecom_user
-      - DATABASE_PASSWORD=ecom_password
-      - DATABASE_NAME=ecom_db
-      - REDIS_HOST=redis
-      - REDIS_PORT=6379
-      - ELASTICSEARCH_NODE=http://elasticsearch:9200
-      - JWT_SECRET=your-super-secret-jwt-key-change-in-production
-      - JWT_EXPIRATION=7d
+      - NODE_ENV=${NODE_ENV:-production}
+      - PORT=${API_GATEWAY_PORT:-3000}
+      # Write Database (for writes)
+      - DATABASE_WRITE_HOST=${DB_WRITE_HOST:-postgres-write}
+      - DATABASE_WRITE_PORT=${DB_PORT:-5432}
+      - DATABASE_WRITE_USER=${DB_USER}
+      - DATABASE_WRITE_PASSWORD=${DB_PASSWORD}
+      - DATABASE_WRITE_NAME=${DB_NAME_WRITE}
+      # Read Database (for reads)
+      - DATABASE_READ_HOST=${DB_READ_HOST:-postgres-read}
+      - DATABASE_READ_PORT=${DB_PORT:-5432}
+      - DATABASE_READ_USER=${DB_USER}
+      - DATABASE_READ_PASSWORD=${DB_PASSWORD}
+      - DATABASE_READ_NAME=${DB_NAME_READ}
+      # Legacy support (defaults to write)
+      - DATABASE_HOST=${DB_WRITE_HOST:-postgres-write}
+      - DATABASE_PORT=${DB_PORT:-5432}
+      - DATABASE_USER=${DB_USER}
+      - DATABASE_PASSWORD=${DB_PASSWORD}
+      - DATABASE_NAME=${DB_NAME_WRITE}
+      # Redis
+      - REDIS_HOST=${REDIS_HOST:-redis}
+      - REDIS_PORT=${REDIS_PORT:-6379}
+      # Elasticsearch
+      - ELASTICSEARCH_NODE=${ELASTICSEARCH_NODE:-http://elasticsearch:9200}
+      # JWT
+      - JWT_SECRET=${JWT_SECRET}
+      - JWT_EXPIRATION=${JWT_EXPIRATION:-7d}
     depends_on:
-      postgres:
+      postgres-write:
+        condition: service_healthy
+      postgres-read:
         condition: service_healthy
       redis:
         condition: service_started
@@ -45,25 +64,58 @@ services:
       - ecom-network
     restart: unless-stopped
 
-  # PostgreSQL Database (CQRS: Laravel writes, NestJS reads)
-  postgres:
+  # PostgreSQL Write Database (CQRS: Primary for writes from both services)
+  postgres-write:
     image: postgres:15-alpine
     ports:
       - "5432:5432"
     environment:
-      - POSTGRES_USER=ecom_user
-      - POSTGRES_PASSWORD=ecom_password
-      - POSTGRES_DB=ecom_db
+      - POSTGRES_USER=${DB_USER}
+      - POSTGRES_PASSWORD=${DB_PASSWORD}
+      - POSTGRES_DB=${DB_NAME_WRITE}
     volumes:
-      - postgres_data:/var/lib/postgresql/data
+      - postgres_write_data:/var/lib/postgresql/data
+    command:
+      - "postgres"
+      - "-c"
+      - "max_connections=200"
+      - "-c"
+      - "shared_preload_libraries=pg_stat_statements"
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U ecom_user -d ecom_db"]
+      test: ["CMD-SHELL", "pg_isready -U ${DB_USER} -d ${DB_NAME_WRITE}"]
       interval: 10s
       timeout: 5s
       retries: 5
     networks:
       - ecom-network
     restart: unless-stopped
+
+  # PostgreSQL Read Database (CQRS: Replica for reads from both services)
+  postgres-read:
+    image: postgres:15-alpine
+    ports:
+      - "5433:5432"
+    environment:
+      - POSTGRES_USER=${DB_USER}
+      - POSTGRES_PASSWORD=${DB_PASSWORD}
+      - POSTGRES_DB=${DB_NAME_READ}
+    volumes:
+      - postgres_read_data:/var/lib/postgresql/data
+    command:
+      - "postgres"
+      - "-c"
+      - "max_connections=200"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${DB_USER} -d ${DB_NAME_READ}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - ecom-network
+    restart: unless-stopped
+    depends_on:
+      postgres-write:
+        condition: service_healthy
 
   # Laravel Admin Service
   admin-service:
@@ -72,34 +124,67 @@ services:
       dockerfile: Dockerfile
       target: production
       args:
-        - NODE_ENV=production
+        - NODE_ENV=${NODE_ENV:-production}
     expose:
       - "8000"
     environment:
-      - APP_NAME=EcomAdmin
-      - APP_ENV=production
-      - APP_DEBUG=false
-      - APP_KEY=base64:uQsffUPbReVqWhDDhrx5FsduqgPKg3JiZQ98MAuKBX4=
-      - APP_URL=http://localhost
+      # Laravel App
+      - APP_NAME=${APP_NAME:-EcomAdmin}
+      - APP_ENV=${APP_ENV:-production}
+      - APP_DEBUG=${APP_DEBUG:-false}
+      - APP_KEY=${APP_KEY}
+      - APP_URL=${APP_URL:-http://localhost}
+      # Write Database (for writes)
+      - DB_WRITE_CONNECTION=pgsql
+      - DB_WRITE_HOST=${DB_WRITE_HOST:-postgres-write}
+      - DB_WRITE_PORT=${DB_PORT:-5432}
+      - DB_WRITE_DATABASE=${DB_NAME_WRITE}
+      - DB_WRITE_USERNAME=${DB_USER}
+      - DB_WRITE_PASSWORD=${DB_PASSWORD}
+      # Read Database (for reads)
+      - DB_READ_CONNECTION=pgsql
+      - DB_READ_HOST=${DB_READ_HOST:-postgres-read}
+      - DB_READ_PORT=${DB_PORT:-5432}
+      - DB_READ_DATABASE=${DB_NAME_READ}
+      - DB_READ_USERNAME=${DB_USER}
+      - DB_READ_PASSWORD=${DB_PASSWORD}
+      # Legacy support (defaults to write)
       - DB_CONNECTION=pgsql
-      - DB_HOST=postgres
-      - DB_PORT=5432
-      - DB_DATABASE=ecom_db
-      - DB_USERNAME=ecom_user
-      - DB_PASSWORD=ecom_password
-      - REDIS_HOST=redis
-      - REDIS_PORT=6379
-      - CACHE_DRIVER=redis
-      - QUEUE_CONNECTION=redis
-      - SESSION_DRIVER=redis
-      - JWT_SECRET=your-super-secret-jwt-key-change-in-production
+      - DB_HOST=${DB_WRITE_HOST:-postgres-write}
+      - DB_PORT=${DB_PORT:-5432}
+      - DB_DATABASE=${DB_NAME_WRITE}
+      - DB_USERNAME=${DB_USER}
+      - DB_PASSWORD=${DB_PASSWORD}
+      # Redis
+      - REDIS_HOST=${REDIS_HOST:-redis}
+      - REDIS_PORT=${REDIS_PORT:-6379}
+      - REDIS_CLIENT=${REDIS_CLIENT:-phpredis}
+      # Cache/Queue/Session
+      - CACHE_DRIVER=${CACHE_DRIVER:-file}
+      - CACHE_STORE=${CACHE_STORE:-file}
+      - QUEUE_CONNECTION=${QUEUE_CONNECTION:-redis}
+      - SESSION_DRIVER=${SESSION_DRIVER:-file}
+      # JWT
+      - JWT_SECRET=${JWT_SECRET}
       - JWT_EXPIRATION=1h
-      - JWT_REFRESH_EXPIRATION=7d
-      - API_GATEWAY_URL=http://api-gateway:3000
+      - JWT_REFRESH_EXPIRATION=${JWT_REFRESH_EXPIRATION:-7d}
+      # Internal URLs
+      - API_GATEWAY_URL=${API_GATEWAY_URL:-http://api-gateway:3000}
+      # Broadcasting (Soketi/Pusher)
+      - BROADCAST_DRIVER=pusher
+      - PUSHER_APP_ID=ecom-app
+      - PUSHER_APP_KEY=ecom-key
+      - PUSHER_APP_SECRET=ecom-secret
+      - PUSHER_HOST=soketi
+      - PUSHER_PORT=6001
+      - PUSHER_SCHEME=http
+      - PUSHER_APP_CLUSTER=mt1
     volumes:
       - admin_storage:/var/www/html/storage
     depends_on:
-      postgres:
+      postgres-write:
+        condition: service_healthy
+      postgres-read:
         condition: service_healthy
       redis:
         condition: service_started
@@ -111,7 +196,7 @@ services:
   redis:
     image: redis:7-alpine
     ports:
-      - "6379:6379"
+      - "${REDIS_PORT:-6379}:6379"
     volumes:
       - redis_data:/data
     command: redis-server --appendonly yes
@@ -120,6 +205,22 @@ services:
       interval: 10s
       timeout: 5s
       retries: 5
+    networks:
+      - ecom-network
+    restart: unless-stopped
+
+  # Soketi (Pusher-compatible WebSocket server for Laravel Echo)
+  soketi:
+    image: quay.io/soketi/soketi:1.6-16-debian
+    ports:
+      - "6001:6001"
+      - "9601:9601"
+    environment:
+      - SOKETI_DEBUG=1
+      - SOKETI_DEFAULT_APP_ID=ecom-app
+      - SOKETI_DEFAULT_APP_KEY=ecom-key
+      - SOKETI_DEFAULT_APP_SECRET=ecom-secret
+      - SOKETI_DEFAULT_APP_ENABLE_CLIENT_MESSAGES=true
     networks:
       - ecom-network
     restart: unless-stopped
@@ -146,7 +247,8 @@ services:
     restart: unless-stopped
 
 volumes:
-  postgres_data:
+  postgres_write_data:
+  postgres_read_data:
   redis_data:
   admin_storage:
   elasticsearch_data:

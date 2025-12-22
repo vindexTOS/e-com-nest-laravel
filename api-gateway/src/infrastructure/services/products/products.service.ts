@@ -1,6 +1,11 @@
-import { Injectable, Logger } from '@nestjs/common';
+import { Injectable, Logger, OnModuleInit, NotFoundException, Inject } from '@nestjs/common';
 import { ElasticsearchService } from '../../search/elasticsearch.service';
 import { RedisService } from '../../cache/redis.service';
+import { InjectRepository, InjectDataSource } from '@nestjs/typeorm';
+import { Repository, DataSource } from 'typeorm';
+import { Product, ProductStatus } from '../../../domain/entities/product.entity';
+import { CreateProductDto } from '../../../domain/dto/product/create-product.dto';
+import { UpdateProductDto } from '../../../domain/dto/product/update-product.dto';
 
 export interface SearchResult<T> {
   data: T[];
@@ -11,21 +16,343 @@ export interface SearchResult<T> {
 }
 
 @Injectable()
-export class ProductsService {
+export class ProductsService implements OnModuleInit {
   private readonly logger = new Logger(ProductsService.name);
   private readonly CACHE_TTL = 3600;
+  private readonly PRODUCTS_CACHE_VERSION_KEY = 'products:cache:version';
+  private readonly PRODUCTS_CACHE_VERSION_TTL = 60 * 60 * 24 * 365 * 10; // 10 years
 
   constructor(
     private readonly elasticsearchService: ElasticsearchService,
     private readonly redisService: RedisService,
+    @InjectRepository(Product, 'read')
+    private readonly productRepository: Repository<Product>,
+    @InjectDataSource('read')
+    private readonly readDataSource: DataSource,
+    @InjectDataSource('write')
+    private readonly writeDataSource: DataSource,
   ) {}
+
+  private async getProductsCacheVersion(): Promise<string> {
+    const existing = await this.redisService.get<string>(this.PRODUCTS_CACHE_VERSION_KEY);
+    if (existing) return existing;
+
+    // Initialize lazily so first request doesn't fail on missing key
+    const initial = Date.now().toString();
+    await this.redisService.set(this.PRODUCTS_CACHE_VERSION_KEY, initial, this.PRODUCTS_CACHE_VERSION_TTL);
+    return initial;
+  }
+
+  async onModuleInit() {
+    this.logger.log('ProductsService initialized, scheduling Elasticsearch sync...');
+    // Delay sync to allow database and ES to be fully ready
+    setTimeout(async () => {
+      try {
+        await this.checkAndSync();
+      } catch (error) {
+        this.logger.error('Failed to perform initial sync:', error);
+        // Retry after another delay
+        setTimeout(async () => {
+          try {
+            await this.checkAndSync();
+          } catch (retryError) {
+            this.logger.error('Failed to perform retry sync:', retryError);
+          }
+        }, 10000);
+      }
+    }, 5000);
+  }
+
+  private isDatabaseReady(): boolean {
+    return !!this.productRepository;
+  }
+
+  private async checkAndSync() {
+    try {
+      if (!this.isDatabaseReady()) {
+        this.logger.warn('Database not ready for sync, will retry later...');
+        return;
+      }
+
+      this.logger.log('Performing initial Elasticsearch sync check...');
+      const result = await this.elasticsearchService.searchProductsWithFilters({
+        page: 1,
+        limit: 1,
+      });
+      
+      const total = typeof result.total === 'object' ? result.total.value : result.total;
+      
+      if (total === 0) {
+        this.logger.log('Elasticsearch index is empty. Triggering automatic sync...');
+        await this.syncToElasticsearch();
+      } else {
+        this.logger.log(`Elasticsearch already has ${total} products. Skipping initial sync.`);
+      }
+    } catch (error) {
+      this.logger.error('Failed to perform initial sync check:', error);
+    }
+  }
+
+  async syncToElasticsearch(): Promise<{ message: string; productsCount: number }> {
+    this.logger.log('Starting full sync to Elasticsearch...');
+
+    if (!this.productRepository) {
+      throw new Error('ProductRepository not available for sync');
+    }
+
+    const products = await this.productRepository.find({
+      relations: ['category'],
+      withDeleted: false,
+    });
+
+    this.logger.log(`Found ${products.length} products in read database, syncing to Elasticsearch...`);
+
+    for (const product of products) {
+      await this.elasticsearchService.indexProduct(product);
+    }
+
+    this.logger.log(`Synced ${products.length} products to Elasticsearch.`);
+    await this.invalidateProductCache();
+
+    return {
+      message: 'Sync completed successfully',
+      productsCount: products.length,
+    };
+  }
+
+  async syncFromWriteDatabase(): Promise<{ message: string; productsCount: number }> {
+    this.logger.log('Starting full sync from write database...');
+
+    const writeQueryRunner = this.writeDataSource.createQueryRunner();
+    await writeQueryRunner.connect();
+
+    try {
+      const products = await writeQueryRunner.query(
+        `SELECT * FROM products WHERE deleted_at IS NULL ORDER BY created_at`
+      );
+
+      this.logger.log(`Found ${products.length} products in write database, syncing to read database and Elasticsearch...`);
+
+      const readQueryRunner = this.readDataSource.createQueryRunner();
+      await readQueryRunner.connect();
+
+      try {
+        let syncedCount = 0;
+        for (const product of products) {
+          const cleanData: Record<string, any> = {};
+          for (const [key, value] of Object.entries(product)) {
+            if (key === 'category' || (typeof value === 'object' && value !== null && !(value instanceof Date))) {
+              continue;
+            }
+            cleanData[key] = value;
+          }
+
+          const columns = Object.keys(cleanData);
+          const placeholders = columns.map((_, i) => `$${i + 1}`).join(', ');
+          const values = columns.map(col => this.convertProductValue(cleanData[col]));
+          const columnNames = columns.map(col => `"${col}"`).join(', ');
+          
+          const updateColumns = columns.filter(c => c !== 'id' && c !== 'created_at');
+          const updateClause = updateColumns.length > 0 
+            ? updateColumns.map(c => `"${c}" = EXCLUDED."${c}"`).join(', ')
+            : '"updated_at" = EXCLUDED."updated_at"';
+
+          await readQueryRunner.query(
+            `INSERT INTO "products" (${columnNames}) VALUES (${placeholders}) ON CONFLICT (id) DO UPDATE SET ${updateClause}`,
+            values
+          );
+
+          await this.elasticsearchService.indexProduct(cleanData);
+          syncedCount++;
+        }
+
+        await this.invalidateProductCache();
+        this.logger.log(`Synced ${syncedCount} products from write database to read database and Elasticsearch.`);
+
+        return {
+          message: 'Sync from write database completed successfully',
+          productsCount: syncedCount,
+        };
+      } finally {
+        await readQueryRunner.release();
+      }
+    } finally {
+      await writeQueryRunner.release();
+    }
+  }
+
+  private convertProductValue(value: any): any {
+    if (value === null || value === undefined) {
+      return null;
+    }
+    if (value instanceof Date) {
+      return value.toISOString();
+    }
+    if (typeof value === 'string' && /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}/.test(value)) {
+      return value;
+    }
+    return value;
+  }
+
+  async syncProductToElasticsearch(productData: any): Promise<void> {
+    this.logger.log(`Syncing individual product to Elasticsearch: ${productData.id}`);
+
+    // Convert the product data to the format expected by Elasticsearch
+    const product = {
+      id: productData.id,
+      name: productData.name,
+      slug: productData.slug,
+      description: productData.description,
+      sku: productData.sku,
+      price: productData.price,
+      compareAtPrice: productData.compare_at_price,
+      costPrice: productData.cost_price,
+      stock: productData.stock,
+      lowStockThreshold: productData.low_stock_threshold,
+      weight: productData.weight,
+      status: productData.status,
+      isFeatured: productData.is_featured,
+      metaTitle: productData.meta_title,
+      metaDescription: productData.meta_description,
+      categoryId: productData.category_id,
+      image: productData.image,
+      createdAt: productData.created_at,
+      updatedAt: productData.updated_at,
+      category: productData.category,
+    };
+
+    await this.elasticsearchService.indexProduct(product);
+    this.logger.log(`Product ${productData.id} synced to Elasticsearch`);
+  }
+
+  async getProducts(params: {
+    search?: string;
+    categoryId?: string;
+    status?: string;
+    page: number;
+    limit: number;
+    withDeleted?: boolean;
+  }): Promise<SearchResult<any>> {
+    const { search, categoryId, status, page, limit, withDeleted } = params;
+
+    if (withDeleted) {
+      return this.getDeletedProducts({ search, categoryId, page, limit });
+    }
+
+    const v = await this.getProductsCacheVersion();
+    const cacheKey = `products:v${v}:list:${search || 'all'}:${categoryId || 'all'}:${status || 'all'}:${page}:${limit}`;
+
+    const cached = await this.redisService.get<SearchResult<any>>(cacheKey);
+    if (cached) {
+      this.logger.debug(`Cache hit for products list: ${cacheKey}`);
+      return cached;
+    }
+
+    const result = await this.elasticsearchService.searchProductsWithFilters({
+      search,
+      categoryId,
+      status: status || 'active',
+      page,
+      limit,
+    });
+
+    let data = result.hits;
+    let total = typeof result.total === 'object' ? result.total.value : result.total;
+
+    if (total === 0 && !search) {
+      this.logger.log('Elasticsearch returned 0 products. Falling back to Database...');
+      const [dbProducts, dbTotal] = await this.productRepository.findAndCount({
+        where: {
+          ...(status ? { status: status as any } : {}),
+          ...(categoryId ? { categoryId } : {}),
+        },
+        relations: ['category'],
+        take: limit,
+        skip: (page - 1) * limit,
+        order: { updatedAt: 'DESC' },
+      });
+      
+      data = dbProducts;
+      total = dbTotal;
+
+      this.syncToElasticsearch().catch(err => this.logger.error('Background sync failed', err));
+    }
+
+    const searchResult: SearchResult<any> = {
+      data,
+      total,
+      page,
+      limit,
+      totalPages: Math.ceil(total / limit),
+    };
+
+    await this.redisService.set(cacheKey, searchResult, this.CACHE_TTL);
+    return searchResult;
+  }
+
+  async getDeletedProducts(params: {
+    search?: string;
+    categoryId?: string;
+    page: number;
+    limit: number;
+  }): Promise<SearchResult<any>> {
+    const { search, categoryId, page, limit } = params;
+
+    const query = this.productRepository
+      .createQueryBuilder('product')
+      .withDeleted()
+      .leftJoinAndSelect('product.category', 'category')
+      .where('product.deletedAt IS NOT NULL');
+
+    if (search) {
+      query.andWhere('(product.name ILIKE :search OR product.sku ILIKE :search)', { search: `%${search}%` });
+    }
+
+    if (categoryId) {
+      query.andWhere('product.categoryId = :categoryId', { categoryId });
+    }
+
+    query.orderBy('product.deletedAt', 'DESC');
+
+    const total = await query.getCount();
+    const data = await query
+      .skip((page - 1) * limit)
+      .take(limit)
+      .getMany();
+
+    return {
+      data,
+      total,
+      page,
+      limit,
+      totalPages: Math.ceil(total / limit),
+    };
+  }
+
+  async getProductById(id: string): Promise<any> {
+    const v = await this.getProductsCacheVersion();
+    const cacheKey = `products:v${v}:detail:${id}`;
+
+    const cached = await this.redisService.get<any>(cacheKey);
+    if (cached) {
+      this.logger.debug(`Cache hit for product detail: ${cacheKey}`);
+      return cached;
+    }
+
+    const product = await this.elasticsearchService.getProductById(id);
+    if (product) {
+      await this.redisService.set(cacheKey, product, this.CACHE_TTL);
+    }
+    return product;
+  }
 
   async searchProducts(
     query: string,
     page: number = 1,
     limit: number = 10,
   ): Promise<SearchResult<any>> {
-    const cacheKey = `search:products:${query}:${page}:${limit}`;
+    const v = await this.getProductsCacheVersion();
+    const cacheKey = `products:v${v}:search:${query}:${page}:${limit}`;
 
     const cached = await this.redisService.get<SearchResult<any>>(cacheKey);
     if (cached) {
@@ -81,10 +408,67 @@ export class ProductsService {
   }
 
   async invalidateProductCache(): Promise<void> {
-    this.logger.debug('Product cache invalidation requested');
+    this.logger.debug('Product cache invalidation requested (bumping products cache version)');
+    const next = Date.now().toString();
+    await this.redisService.set(this.PRODUCTS_CACHE_VERSION_KEY, next, this.PRODUCTS_CACHE_VERSION_TTL);
   }
 
-  async invalidateCategoryCache(): Promise<void> {
-    this.logger.debug('Category cache invalidation requested');
+  async deleteProductFromElasticsearch(id: string): Promise<void> {
+    await this.elasticsearchService.deleteProduct(id);
   }
+
+  async createProduct(createProductDto: CreateProductDto): Promise<Product> {
+    // Generate slug if not provided
+    const slug = createProductDto.slug || this.generateSlug(createProductDto.name);
+
+    const product = this.productRepository.create({
+      ...createProductDto,
+      slug,
+      stock: createProductDto.stock ?? 0,
+      status: createProductDto.status || ProductStatus.DRAFT,
+      lowStockThreshold: createProductDto.lowStockThreshold ?? 10,
+      isFeatured: createProductDto.isFeatured ?? false,
+    });
+
+    const saved = await this.productRepository.save(product);
+
+    // Sync to Elasticsearch
+    await this.syncProductToElasticsearch(saved);
+    await this.invalidateProductCache();
+
+    return saved;
+  }
+
+  async updateProduct(id: string, updateProductDto: UpdateProductDto): Promise<Product> {
+    const product = await this.productRepository.findOne({
+      where: { id },
+      relations: ['category'],
+    });
+
+    if (!product) {
+      throw new NotFoundException(`Product with ID ${id} not found`);
+    }
+
+    // Generate slug if name changed and slug not provided
+    if (updateProductDto.name && !updateProductDto.slug) {
+      updateProductDto.slug = this.generateSlug(updateProductDto.name);
+    }
+
+    Object.assign(product, updateProductDto);
+    const saved = await this.productRepository.save(product);
+
+    // Sync to Elasticsearch
+    await this.syncProductToElasticsearch(saved);
+    await this.invalidateProductCache();
+
+    return saved;
+  }
+
+  private generateSlug(name: string): string {
+    return name
+      .toLowerCase()
+      .replace(/[^a-z0-9]+/g, '-')
+      .replace(/(^-|-$)/g, '');
+  }
+
 }

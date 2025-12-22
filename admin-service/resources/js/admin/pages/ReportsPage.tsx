@@ -1,8 +1,10 @@
-import React, { useEffect, useState } from 'react';
-import { Layout, Card, Row, Col, Statistic, Select, DatePicker, Button, Table, message } from 'antd';
-import { DollarOutlined, ShoppingCartOutlined, DownloadOutlined } from '@ant-design/icons';
-import { ordersApi } from '../../api';
+import React, { useState } from 'react';
+import { Layout, Card, Row, Col, Statistic, Select, DatePicker, Button, Table, message, Dropdown } from 'antd';
+import { DollarOutlined, ShoppingCartOutlined, DownloadOutlined, FileTextOutlined, FilePdfOutlined } from '@ant-design/icons';
+import { useQuery, keepPreviousData } from '@tanstack/react-query';
+import { nestjsOrdersApi } from '../../api';
 import AdminLayout from '../components/AdminLayout';
+import { exportReportsToCSV, exportReportsToPDF } from '../../shared/utils/exportUtils';
 import dayjs from 'dayjs';
 
 const { Content } = Layout;
@@ -12,42 +14,76 @@ const { Option } = Select;
 const ReportsPage: React.FC = () => {
     const [period, setPeriod] = useState<'daily' | 'weekly' | 'monthly'>('monthly');
     const [dateRange, setDateRange] = useState<[dayjs.Dayjs, dayjs.Dayjs] | null>(null);
-    const [reports, setReports] = useState<any>(null);
-    const [loading, setLoading] = useState(false);
-
-    useEffect(() => {
-        loadReports();
-    }, [period, dateRange]);
-
-    const loadReports = async () => {
-        setLoading(true);
-        try {
+    const reportsQuery = useQuery({
+        queryKey: ['reports', period, dateRange?.[0]?.valueOf(), dateRange?.[1]?.valueOf()],
+        queryFn: async () => {
             const dateFrom = dateRange ? dateRange[0].format('YYYY-MM-DD') : undefined;
             const dateTo = dateRange ? dateRange[1].format('YYYY-MM-DD') : undefined;
-            const response = await ordersApi.getReports(period, dateFrom, dateTo);
-            setReports(response.data);
-        } catch (error) {
-            message.error('Failed to load reports');
-        } finally {
-            setLoading(false);
+            const resp = await nestjsOrdersApi.getAll({ limit: 200, offset: 0, date_from: dateFrom, date_to: dateTo });
+            const data = Array.isArray((resp as any)?.data?.data) ? (resp as any).data.data : [];
+            const total = (resp as any)?.data?.total ?? data.length ?? 0;
+            const byStatus: Record<string, { count: number; revenue: number }> = {};
+            data.forEach((o: any) => {
+                const key = o.status || 'unknown';
+                const rev = Number(o.total ?? 0);
+                byStatus[key] = byStatus[key] || { count: 0, revenue: 0 };
+                byStatus[key].count += 1;
+                byStatus[key].revenue += rev;
+            });
+            const statusRows = Object.entries(byStatus).map(([status, v]) => ({
+                status,
+                count: v.count,
+                revenue: v.revenue,
+            }));
+            return {
+                total_orders: total,
+                total_revenue: statusRows.reduce((s, r) => s + r.revenue, 0),
+                average_order_value: total ? statusRows.reduce((s, r) => s + r.revenue, 0) / total : 0,
+                orders_by_status: statusRows,
+            };
+        },
+        placeholderData: keepPreviousData,
+    });
+    const reports = reportsQuery.data;
+    const loading = reportsQuery.isFetching;
+
+    const handleExport = (format: 'csv' | 'pdf') => {
+        if (!reports) {
+            message.warning('No data to export');
+            return;
         }
-    };
 
-    const handleExport = async () => {
         try {
-            const dateFrom = dateRange ? dateRange[0].format('YYYY-MM-DD') : undefined;
-            const dateTo = dateRange ? dateRange[1].format('YYYY-MM-DD') : undefined;
-            const blob = await ordersApi.export('csv');
-            const url = window.URL.createObjectURL(blob);
-            const a = document.createElement('a');
-            a.href = url;
-            a.download = `sales_report_${period}_${new Date().toISOString().split('T')[0]}.csv`;
-            a.click();
-            message.success('Export started');
+            const dateRangeDates = dateRange 
+                ? [dateRange[0].toDate(), dateRange[1].toDate()] as [Date, Date]
+                : undefined;
+
+            if (format === 'csv') {
+                exportReportsToCSV(reports, period, dateRangeDates);
+                message.success('Report exported to CSV');
+            } else {
+                exportReportsToPDF(reports, period, dateRangeDates);
+                message.success('Report exported to PDF');
+            }
         } catch (error) {
             message.error('Failed to export report');
         }
     };
+
+    const exportMenuItems = [
+        {
+            key: 'csv',
+            label: 'Export as CSV',
+            icon: <FileTextOutlined />,
+            onClick: () => handleExport('csv'),
+        },
+        {
+            key: 'pdf',
+            label: 'Export as PDF',
+            icon: <FilePdfOutlined />,
+            onClick: () => handleExport('pdf'),
+        },
+    ];
 
     const statusColumns = [
         { title: 'Status', dataIndex: 'status', key: 'status' },
@@ -56,7 +92,7 @@ const ReportsPage: React.FC = () => {
             title: 'Revenue',
             dataIndex: 'revenue',
             key: 'revenue',
-            render: (revenue: number) => `$${revenue.toFixed(2)}`,
+            render: (revenue: any) => `$${Number(revenue ?? 0).toFixed(2)}`,
         },
     ];
 
@@ -84,9 +120,11 @@ const ReportsPage: React.FC = () => {
                             />
                         </Col>
                         <Col xs={24} sm={4}>
-                            <Button icon={<DownloadOutlined />} onClick={handleExport} block>
-                                Export
-                            </Button>
+                            <Dropdown menu={{ items: exportMenuItems }} trigger={['click']}>
+                                <Button icon={<DownloadOutlined />} block>
+                                    Export
+                                </Button>
+                            </Dropdown>
                         </Col>
                     </Row>
                 </Card>

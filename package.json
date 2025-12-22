@@ -1,0 +1,13 @@
+{
+  "name": "e-com-nest-laravel",
+  "version": "1.0.0",
+  "description": "E-commerce platform with Nest.js API Gateway and Laravel Admin Panel",
+  "scripts": {
+    "test": "npm run test:api && npm run test:admin",
+    "test:api": "cd api-gateway && npm test",
+    "test:admin": "cd admin-service && composer test",
+    "test:watch": "cd api-gateway && npm run test:watch"
+  },
+  "private": true
+}
+

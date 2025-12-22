@@ -20,12 +20,19 @@ export class OrdersService {
     orderNumber?: string;
     limit?: number;
     offset?: number;
+    withDeleted?: boolean;
   }): Promise<{ data: Order[]; total: number }> {
     const query = this.orderRepository
       .createQueryBuilder('order')
       .leftJoinAndSelect('order.user', 'user')
       .leftJoinAndSelect('order.items', 'items')
       .leftJoinAndSelect('items.product', 'product');
+
+    if (filters.withDeleted) {
+      query.withDeleted().andWhere('order.deletedAt IS NOT NULL');
+    } else {
+      query.andWhere('order.deletedAt IS NULL');
+    }
 
     if (filters.userId) {
       query.andWhere('order.userId = :userId', { userId: filters.userId });
@@ -42,8 +49,8 @@ export class OrdersService {
     }
 
     if (filters.orderNumber) {
-      query.andWhere('order.orderNumber = :orderNumber', {
-        orderNumber: filters.orderNumber,
+      query.andWhere('order.orderNumber ILIKE :orderNumber', {
+        orderNumber: `%${filters.orderNumber}%`,
       });
     }
 
@@ -63,6 +70,21 @@ export class OrdersService {
     return { data, total };
   }
 
+  async restore(id: string): Promise<Order> {
+    const result = await this.orderRepository.restore(id);
+    if (result.affected === 0) {
+      throw new NotFoundException(`Order with ID ${id} not found`);
+    }
+    return this.findOne(id);
+  }
+
+  async softDelete(id: string): Promise<void> {
+    const result = await this.orderRepository.softDelete(id);
+    if (result.affected === 0) {
+      throw new NotFoundException(`Order with ID ${id} not found`);
+    }
+  }
+
   async findOne(id: string): Promise<Order> {
     const order = await this.orderRepository.findOne({
       where: { id },
@@ -74,97 +96,6 @@ export class OrdersService {
     }
 
     return order;
-  }
-
-  async syncOrder(orderData: any): Promise<Order> {
-    const existingOrder = await this.orderRepository.findOne({
-      where: { id: orderData.id },
-    });
-
-    if (existingOrder) {
-      Object.assign(existingOrder, {
-        userId: orderData.user_id,
-        orderNumber: orderData.order_number,
-        status: orderData.status,
-        fulfillmentStatus: orderData.fulfillment_status,
-        subtotal: parseFloat(orderData.subtotal),
-        tax: parseFloat(orderData.tax),
-        shipping: parseFloat(orderData.shipping),
-        discount: parseFloat(orderData.discount),
-        total: parseFloat(orderData.total),
-        currency: orderData.currency,
-        shippingAddress: orderData.shipping_address,
-        billingAddress: orderData.billing_address,
-        paymentMethod: orderData.payment_method,
-        paymentStatus: orderData.payment_status,
-        fulfilledAt: orderData.fulfilled_at ? new Date(orderData.fulfilled_at) : null,
-        shippedAt: orderData.shipped_at ? new Date(orderData.shipped_at) : null,
-        deliveredAt: orderData.delivered_at ? new Date(orderData.delivered_at) : null,
-        notes: orderData.notes,
-      });
-
-      await this.orderRepository.save(existingOrder);
-
-      await this.orderItemRepository.delete({ orderId: orderData.id });
-
-      for (const itemData of orderData.items || []) {
-        const orderItem = this.orderItemRepository.create({
-          id: itemData.id,
-          orderId: itemData.order_id,
-          productId: itemData.product_id,
-          productName: itemData.product_name,
-          productSku: itemData.product_sku,
-          quantity: itemData.quantity,
-          unitPrice: parseFloat(itemData.unit_price),
-          totalPrice: parseFloat(itemData.total_price),
-          quantityFulfilled: itemData.quantity_fulfilled,
-        });
-        await this.orderItemRepository.save(orderItem);
-      }
-
-      return this.findOne(orderData.id);
-    } else {
-      const order = this.orderRepository.create({
-        id: orderData.id,
-        userId: orderData.user_id,
-        orderNumber: orderData.order_number,
-        status: orderData.status,
-        fulfillmentStatus: orderData.fulfillment_status,
-        subtotal: parseFloat(orderData.subtotal),
-        tax: parseFloat(orderData.tax),
-        shipping: parseFloat(orderData.shipping),
-        discount: parseFloat(orderData.discount),
-        total: parseFloat(orderData.total),
-        currency: orderData.currency,
-        shippingAddress: orderData.shipping_address,
-        billingAddress: orderData.billing_address,
-        paymentMethod: orderData.payment_method,
-        paymentStatus: orderData.payment_status,
-        fulfilledAt: orderData.fulfilled_at ? new Date(orderData.fulfilled_at) : null,
-        shippedAt: orderData.shipped_at ? new Date(orderData.shipped_at) : null,
-        deliveredAt: orderData.delivered_at ? new Date(orderData.delivered_at) : null,
-        notes: orderData.notes,
-      });
-
-      await this.orderRepository.save(order);
-
-      for (const itemData of orderData.items || []) {
-        const orderItem = this.orderItemRepository.create({
-          id: itemData.id,
-          orderId: itemData.order_id,
-          productId: itemData.product_id,
-          productName: itemData.product_name,
-          productSku: itemData.product_sku,
-          quantity: itemData.quantity,
-          unitPrice: parseFloat(itemData.unit_price),
-          totalPrice: parseFloat(itemData.total_price),
-          quantityFulfilled: itemData.quantity_fulfilled,
-        });
-        await this.orderItemRepository.save(orderItem);
-      }
-
-      return this.findOne(orderData.id);
-    }
   }
 }
 

@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { Form, Input, Button, Card, message, Typography } from 'antd';
 import { UserOutlined, LockOutlined } from '@ant-design/icons';
-import { laravelAuthApi } from '../../api';
+import { authGql } from '../../graphql';
 import { useAuth } from '../../shared/hooks/useAuth';
 
 const { Title, Text } = Typography;
@@ -21,7 +21,7 @@ const UserLogin: React.FC = () => {
     const onFinish = async (values: LoginFormValues) => {
         setLoading(true);
         try {
-            const response = await laravelAuthApi.login({
+            const response = await authGql.login({
                 email: values.email,
                 password: values.password,
             });

@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Form, Input, Button, Card, message, Typography } from 'antd';
 import { UserOutlined, LockOutlined } from '@ant-design/icons';
-import { laravelAdminApi } from '../../api';
+import { authGql } from '../../graphql';
 import { useAuth } from '../../shared/hooks/useAuth';
 
 const { Title } = Typography;
@@ -21,7 +21,7 @@ const AdminLogin: React.FC = () => {
     const onFinish = async (values: LoginFormValues) => {
         setLoading(true);
         try {
-            const response = await laravelAdminApi.login({
+            const response = await authGql.adminLogin({
                 email: values.email,
                 password: values.password,
             });
@@ -38,7 +38,24 @@ const AdminLogin: React.FC = () => {
                 message.error('Access denied. Admin credentials required.');
             }
         } catch (error: any) {
-            const errorMessage = error.response?.data?.message || 'Login failed. Please try again.';
+            // GraphQL errors come in different formats
+            let errorMessage = 'Login failed. Please try again.';
+            
+            if (error.message) {
+                // GraphQL client throws Error with message
+                errorMessage = error.message;
+            } else if (error.response?.data?.errors?.[0]?.message) {
+                // Direct GraphQL error format
+                errorMessage = error.response.data.errors[0].message;
+            } else if (error.response?.data?.message) {
+                // REST API error format
+                errorMessage = error.response.data.message;
+            } else if (error.response?.data?.error) {
+                // Alternative error format
+                errorMessage = error.response.data.error;
+            }
+            
+            console.error('Login error:', error);
             message.error(errorMessage);
         } finally {
             setLoading(false);

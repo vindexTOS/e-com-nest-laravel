@@ -1,55 +1,116 @@
-import React, { useEffect, useState } from 'react';
-import { Layout, Table, Button, Space, Input, Select, Card, Modal, Form, Upload, message, Tag, Popconfirm, Row, Col } from 'antd';
-import { PlusOutlined, EditOutlined, DeleteOutlined, UndoOutlined, UploadOutlined, DownloadOutlined, SearchOutlined } from '@ant-design/icons';
-import { productsApi, categoriesApi, Product, Category } from '../../api';
-import { useAuth } from '../../shared/hooks/useAuth';
-import { useNavigate } from 'react-router-dom';
+import React, { useState } from 'react';
+import { Layout, Table, Button, Space, Input, Select, Card, Modal, Form, Upload, message, Tag, Popconfirm, Row, Col, InputNumber } from 'antd';
+import { PlusOutlined, EditOutlined, DeleteOutlined, UndoOutlined, UploadOutlined, DownloadOutlined, SearchOutlined, DatabaseOutlined } from '@ant-design/icons';
+import { useMutation, useQuery, useQueryClient, keepPreviousData } from '@tanstack/react-query';
+import { nestjsProductsApi } from '../../api';
+import { productsGql, seedersGql, categoriesGql } from '../../graphql';
+import type { ProductListResponse } from '../../api/nestjs/products.api';
+import type { Product, Category } from '../../api';
 import AdminLayout from '../components/AdminLayout';
+import { getImageUrl } from '../../shared/utils/imageUtils';
+import { exportToCSV } from '../../shared/utils/exportUtils';
 
 const { Content } = Layout;
 const { Option } = Select;
 
 const ProductsPage: React.FC = () => {
-    const { user } = useAuth();
-    const navigate = useNavigate();
-    const [products, setProducts] = useState<Product[]>([]);
-    const [categories, setCategories] = useState<Category[]>([]);
-    const [loading, setLoading] = useState(false);
+    const queryClient = useQueryClient();
     const [modalVisible, setModalVisible] = useState(false);
     const [editingProduct, setEditingProduct] = useState<Product | null>(null);
     const [form] = Form.useForm();
     const [filters, setFilters] = useState({ search: '', status: '', category_id: '', trashed: false });
-    const [pagination, setPagination] = useState({ current: 1, pageSize: 15, total: 0 });
+    const [pagination, setPagination] = useState({ current: 1, pageSize: 15 });
+    const [seedCount, setSeedCount] = useState(10);
+    const categoriesQuery = useQuery<Category[]>({
+        queryKey: ['categories', 'root'],
+        queryFn: async () => {
+            const response = await categoriesGql.getAll({ page: 1, limit: 200, parentId: 'null' });
+            return response.data || [];
+        },
+    });
 
-    useEffect(() => {
-        loadCategories();
-        loadProducts();
-    }, [filters, pagination.current]);
-
-    const loadCategories = async () => {
-        try {
-            const response = await categoriesApi.getAll({ root_only: true });
-            setCategories(response.data.data || []);
-        } catch (error) {
-            console.error('Failed to load categories:', error);
-        }
-    };
-
-    const loadProducts = async () => {
-        setLoading(true);
-        try {
-            const response = await productsApi.getAll({
-                ...filters,
-                per_page: pagination.pageSize,
+    const productsQuery = useQuery({
+        queryKey: ['products', filters, pagination.current, pagination.pageSize],
+        queryFn: async (): Promise<ProductListResponse> => {
+            const response = await nestjsProductsApi.getAll({
+                search: filters.search || undefined,
+                status: filters.status || undefined,
+                categoryId: filters.category_id || undefined,
+                limit: pagination.pageSize,
+                page: pagination.current,
+                trashed: filters.trashed ? 'true' : undefined,
             });
-            setProducts(response.data.data || []);
-            setPagination(prev => ({ ...prev, total: response.data.total || 0 }));
-        } catch (error) {
-            message.error('Failed to load products');
-        } finally {
-            setLoading(false);
-        }
-    };
+            return response.data;
+        },
+        placeholderData: keepPreviousData,
+    });
+
+    const delay = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
+
+    const saveProduct = useMutation({
+        mutationFn: async ({ id, input }: { id?: string; input: any }) => {
+            if (id) return productsGql.update(id, input);
+            return productsGql.create(input);
+        },
+        onSuccess: async (_, variables) => {
+            message.success(variables.id ? 'Product updated successfully' : 'Product created successfully');
+            setModalVisible(false);
+            setEditingProduct(null);
+            form.resetFields();
+            await delay(500); // wait for cross-service consistency (Laravel write, NestJS read)
+            await queryClient.refetchQueries({ queryKey: ['products'] });
+        },
+        onError: (error: any) => {
+            message.error(error.response?.data?.message || 'Operation failed');
+        },
+    });
+
+    const deleteProduct = useMutation({
+        mutationFn: (id: string) => productsGql.delete(id),
+        onSuccess: async () => {
+            message.success('Product deleted successfully');
+            await delay(500);
+            await queryClient.refetchQueries({ queryKey: ['products'] });
+        },
+        onError: () => message.error('Failed to delete product'),
+    });
+
+    const restoreProduct = useMutation({
+        mutationFn: (id: string) => productsGql.restore(id),
+        onSuccess: async () => {
+            message.success('Product restored successfully');
+            await delay(500);
+            await queryClient.refetchQueries({ queryKey: ['products'] });
+        },
+        onError: () => message.error('Failed to restore product'),
+    });
+
+    const importProducts = useMutation({
+        mutationFn: (file: File) => productsGql.importProducts(file),
+        onSuccess: async () => {
+            message.success('Import queued successfully');
+            await queryClient.refetchQueries({ queryKey: ['products'] });
+        },
+        onError: () => message.error('Failed to import products'),
+    });
+
+    const seedProducts = useMutation({
+        mutationFn: (count: number) => seedersGql.seedProducts(count),
+        onSuccess: async (_response, count) => {
+            message.success(`Seeded ${count} products`);
+            await queryClient.refetchQueries({ queryKey: ['products'] });
+        },
+        onError: (error: any) => {
+            message.error(error.response?.data?.message || 'Failed to seed products');
+        },
+    });
+
+    const queryData = productsQuery.data as ProductListResponse | undefined;
+    const products = queryData?.data || [];
+    const categories = categoriesQuery.data || [];
+    const total = queryData?.total ?? 0;
+    const loading = productsQuery.isFetching;
+    const seeding = seedProducts.isPending;
 
     const handleCreate = () => {
         setEditingProduct(null);
@@ -64,76 +125,76 @@ const ProductsPage: React.FC = () => {
     };
 
     const handleDelete = async (id: string) => {
-        try {
-            await productsApi.delete(id);
-            message.success('Product deleted successfully');
-            loadProducts();
-        } catch (error) {
-            message.error('Failed to delete product');
-        }
+        deleteProduct.mutate(id);
     };
 
     const handleRestore = async (id: string) => {
-        try {
-            await productsApi.restore(id);
-            message.success('Product restored successfully');
-            loadProducts();
-        } catch (error) {
-            message.error('Failed to restore product');
-        }
+        restoreProduct.mutate(id);
     };
 
     const handleSubmit = async (values: any) => {
-        try {
-            const formData = new FormData();
-            Object.keys(values).forEach(key => {
-                if (key !== 'image' && values[key] !== undefined) {
-                    formData.append(key, values[key]);
-                }
-            });
+        const imageFile = values.image?.file?.originFileObj || values.image?.file;
+        const input = {
+            name: values.name,
+            description: values.description,
+            sku: values.sku,
+            price: Number(values.price),
+            compare_at_price: values.compare_at_price !== undefined && values.compare_at_price !== null ? Number(values.compare_at_price) : undefined,
+            cost_price: values.cost_price !== undefined && values.cost_price !== null ? Number(values.cost_price) : undefined,
+            stock: values.stock !== undefined && values.stock !== null ? Number(values.stock) : undefined,
+            low_stock_threshold: values.low_stock_threshold !== undefined && values.low_stock_threshold !== null ? Number(values.low_stock_threshold) : undefined,
+            weight: values.weight !== undefined && values.weight !== null ? Number(values.weight) : undefined,
+            status: values.status,
+            is_featured: values.is_featured ?? false,
+            meta_title: values.meta_title,
+            meta_description: values.meta_description,
+            category_id: values.category_id || undefined,
+            image: imageFile || null,
+        };
 
-            if (values.image && values.image.file) {
-                formData.append('image', values.image.file.originFileObj || values.image.file);
-            }
-
-            if (editingProduct) {
-                await productsApi.update(editingProduct.id, formData);
-                message.success('Product updated successfully');
-            } else {
-                await productsApi.create(formData);
-                message.success('Product created successfully');
-            }
-
-            setModalVisible(false);
-            form.resetFields();
-            loadProducts();
-        } catch (error: any) {
-            message.error(error.response?.data?.message || 'Operation failed');
-        }
+        await saveProduct.mutateAsync({ id: editingProduct?.id, input });
     };
 
     const handleImport = async (file: File) => {
-        try {
-            await productsApi.import(file);
-            message.success('Import queued successfully');
-            loadProducts();
-        } catch (error) {
-            message.error('Failed to import products');
-        }
+        await importProducts.mutateAsync(file);
     };
 
     const handleExport = async () => {
         try {
-            const blob = await productsApi.export();
-            const url = window.URL.createObjectURL(blob);
-            const a = document.createElement('a');
-            a.href = url;
-            a.download = `products_${new Date().toISOString().split('T')[0]}.csv`;
-            a.click();
-            message.success('Export started');
+            const exportQueryData = productsQuery.data as ProductListResponse | undefined;
+            if (!exportQueryData?.data || exportQueryData.data.length === 0) {
+                message.warning('No products to export');
+                return;
+            }
+
+            const products = exportQueryData.data;
+            const exportData = products.map((product: any) => ({
+                Name: product.name || '',
+                SKU: product.sku || '',
+                Description: product.description || '',
+                Price: product.price || 0,
+                Stock: product.stock || 0,
+                Status: product.status || '',
+                Category: product.category?.name || '',
+                'Low Stock Threshold': product.lowStockThreshold || product.low_stock_threshold || 0,
+                Weight: product.weight || '',
+                'Compare At Price': product.compareAtPrice || product.compare_at_price || '',
+                'Cost Price': product.costPrice || product.cost_price || '',
+                Featured: product.isFeatured || product.is_featured ? 'Yes' : 'No',
+            }));
+
+            exportToCSV(exportData, `products_export_${new Date().toISOString().split('T')[0]}`, [
+                'Name', 'SKU', 'Description', 'Price', 'Stock', 'Status', 'Category',
+                'Low Stock Threshold', 'Weight', 'Compare At Price', 'Cost Price', 'Featured'
+            ]);
+            message.success('Products exported to CSV');
         } catch (error) {
             message.error('Failed to export products');
         }
+    };
+
+    const handleSeed = async () => {
+        await seedProducts.mutateAsync(seedCount);
     };
 
     const columns = [
@@ -141,7 +202,7 @@ const ProductsPage: React.FC = () => {
             title: 'Image',
             dataIndex: 'image',
             key: 'image',
-            render: (image: string) => image ? <img src={image} alt="" style={{ width: 50, height: 50, objectFit: 'cover' }} /> : '-',
+            render: (image: string) => image ? <img src={getImageUrl(image) || ''} alt="" style={{ width: 50, height: 50, objectFit: 'cover' }} /> : '-',
         },
         {
             title: 'Name',
@@ -157,7 +218,10 @@ const ProductsPage: React.FC = () => {
             title: 'Price',
             dataIndex: 'price',
             key: 'price',
-            render: (price: number) => `$${price.toFixed(2)}`,
+            render: (price: any) => {
+                const num = Number(price ?? 0);
+                return `$${isNaN(num) ? '0.00' : num.toFixed(2)}`;
+            },
         },
         {
             title: 'Stock',
@@ -182,12 +246,14 @@ const ProductsPage: React.FC = () => {
         {
             title: 'Actions',
             key: 'actions',
-            render: (_: any, record: Product) => (
+            render: (_: any, record: Product) => {
+                const isDeleted = (record as any).deletedAt || record.deleted_at;
+                return (
                 <Space>
                     <Button icon={<EditOutlined />} onClick={() => handleEdit(record)} />
-                    {record.deleted_at ? (
+                        {isDeleted ? (
                         <Popconfirm title="Restore this product?" onConfirm={() => handleRestore(record.id)}>
-                            <Button icon={<UndoOutlined />} />
+                                <Button icon={<UndoOutlined />} type="primary">Restore</Button>
                         </Popconfirm>
                     ) : (
                         <Popconfirm title="Delete this product?" onConfirm={() => handleDelete(record.id)}>
@@ -195,7 +261,8 @@ const ProductsPage: React.FC = () => {
                         </Popconfirm>
                     )}
                 </Space>
-            ),
+                );
+            },
         },
     ];
 
@@ -210,7 +277,7 @@ const ProductsPage: React.FC = () => {
                                 prefix={<SearchOutlined />}
                                 value={filters.search}
                                 onChange={(e) => setFilters({ ...filters, search: e.target.value })}
-                                onPressEnter={loadProducts}
+                                onPressEnter={() => productsQuery.refetch()}
                             />
                         </Col>
                         <Col xs={24} sm={12} md={4}>
@@ -264,6 +331,27 @@ const ProductsPage: React.FC = () => {
                         </Col>
                     </Row>
 
+                    <Row gutter={[16, 16]} style={{ marginBottom: 16 }}>
+                        <Col xs={24} sm={12} md={8}>
+                            <Space>
+                                <InputNumber
+                                    min={1}
+                                    max={1000}
+                                    value={seedCount}
+                                    onChange={(value) => setSeedCount(value || 10)}
+                                    style={{ width: 150 }}
+                                />
+                                <Button
+                                    icon={<DatabaseOutlined />}
+                                    loading={seeding}
+                                    onClick={handleSeed}
+                                >
+                                    Seed Products
+                                </Button>
+                            </Space>
+                        </Col>
+                    </Row>
+
                     <Table
                         columns={columns}
                         dataSource={products}
@@ -271,6 +359,7 @@ const ProductsPage: React.FC = () => {
                         rowKey="id"
                         pagination={{
                             ...pagination,
+                            total,
                             onChange: (page, pageSize) => setPagination({ ...pagination, current: page, pageSize }),
                         }}
                     />
@@ -305,17 +394,17 @@ const ProductsPage: React.FC = () => {
                                 </Form.Item>
                             </Col>
                             <Col span={12}>
-                                <Form.Item name="price" label="Price" rules={[{ required: true, type: 'number' }]}>
+                                <Form.Item name="price" label="Price" >
                                     <Input type="number" step="0.01" />
                                 </Form.Item>
                             </Col>
                         </Row>
                         <Row gutter={16}>
                             <Col span={12}>
-                                <Form.Item name="stock" label="Stock" rules={[{ type: 'number' }]}>
+                                <Form.Item name="stock" label="Stock"  >
                                     <Input type="number" />
                                 </Form.Item>
-                            </Col>
+                            </Col> 
                             <Col span={12}>
                                 <Form.Item name="status" label="Status">
                                     <Select>

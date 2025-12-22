@@ -1,19 +1,30 @@
 import { DataSource } from 'typeorm';
-import { config } from 'dotenv';
 import { join } from 'path';
 
-config();
-
-export const AppDataSource = new DataSource({
+export const WriteDataSource = new DataSource({
   type: 'postgres',
-  host: process.env.DATABASE_HOST || 'localhost',
-  port: parseInt(process.env.DATABASE_PORT || '5432', 10),
-  username: process.env.DATABASE_USER || 'ecom_user',
-  password: process.env.DATABASE_PASSWORD || 'ecom_password',
-  database: process.env.DATABASE_NAME || 'ecom_db',
+  host: 'postgres-write',
+  port: 5432,
+  username: 'ecom_user',
+  password: 'ecom_password',
+  database: 'ecom_db_write',
   entities: [join(__dirname, '../../**/*.entity.{ts,js}')],
   migrations: [join(__dirname, './migrations/*.{ts,js}')],
   synchronize: false,
-  logging: process.env.NODE_ENV === 'development',
+  logging: true,
 });
+
+export const ReadDataSource = new DataSource({
+  type: 'postgres',
+  host: 'postgres-read',
+  port: 5432,
+  username: 'ecom_user',
+  password: 'ecom_password',
+  database: 'ecom_db_read',
+  entities: [join(__dirname, '../../**/*.entity.{ts,js}')],
+  synchronize: false,
+  logging: true,
+});
+
+export const AppDataSource = WriteDataSource;
 

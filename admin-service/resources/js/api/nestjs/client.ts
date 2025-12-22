@@ -1,6 +1,7 @@
 import axios, { AxiosInstance, AxiosError, InternalAxiosRequestConfig } from 'axios';
+import { emitAuthUnauthorized } from '../../shared/utils/authEvents';
 
-const NESTJS_API_URL = import.meta.env.VITE_NESTJS_API_URL || window.location.origin;
+const NESTJS_API_URL = `${window.location.origin}/api/gateway`;
 
 const nestjsClient: AxiosInstance = axios.create({
     baseURL: NESTJS_API_URL,
@@ -54,7 +55,7 @@ nestjsClient.interceptors.response.use(
                 localStorage.removeItem('accessToken');
                 localStorage.removeItem('refreshToken');
                 localStorage.removeItem('user');
-                window.location.href = '/login';
+                emitAuthUnauthorized();
                 return Promise.reject(refreshError);
             }
         }

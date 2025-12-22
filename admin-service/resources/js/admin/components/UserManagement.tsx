@@ -1,48 +1,49 @@
-import React, { useEffect, useState } from 'react';
+import React, { useState } from 'react';
 import { Table, Button, Space, Input, Select, Modal, Form, message, Tag, Popconfirm, Row, Col, Card, InputNumber, Switch } from 'antd';
 import { PlusOutlined, EditOutlined, DeleteOutlined, SearchOutlined, DatabaseOutlined } from '@ant-design/icons';
-import { usersApi, seedersApi, User } from '../../api';
-
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { nestjsUserApi } from '../../api';
+import { usersGql, seedersGql } from '../../graphql';
+import { User } from '../../types';
 const { Option } = Select;
 
 interface UserManagementProps {
     onClose?: () => void;
 }
 
-const UserManagement: React.FC<UserManagementProps> = ({ onClose }) => {
-    const [users, setUsers] = useState<User[]>([]);
-    const [loading, setLoading] = useState(false);
+const UserManagement: React.FC<UserManagementProps> = () => {
+    const queryClient = useQueryClient();
     const [modalVisible, setModalVisible] = useState(false);
     const [editingUser, setEditingUser] = useState<User | null>(null);
     const [form] = Form.useForm();
-    const [filters, setFilters] = useState({ search: '', role: '', is_active: undefined });
+    const [filters, setFilters] = useState<{ search: string; role: string; is_active?: boolean }>({
+        search: '',
+        role: '',
+        is_active: undefined,
+    });
     const [pagination, setPagination] = useState({ current: 1, pageSize: 15, total: 0 });
     const [seeding, setSeeding] = useState(false);
     const [seedCount, setSeedCount] = useState(10);
 
-    useEffect(() => {
-        loadUsers();
-    }, [filters, pagination.current]);
-
-    const loadUsers = async () => {
-        setLoading(true);
-        try {
-            const response = await usersApi.getAll({
-                ...filters,
-                per_page: pagination.pageSize,
-            });
-            setUsers(response.data.data || []);
-            setPagination(prev => ({ ...prev, total: response.data.total || 0 }));
-        } catch (error) {
-            message.error('Failed to load users');
-        } finally {
-            setLoading(false);
-        }
-    };
+    const usersQuery = useQuery({
+        queryKey: ['users', 'management', filters, pagination.current, pagination.pageSize],
+        queryFn: async () => {
+            const response = await nestjsUserApi.getUsers({ page: pagination.current, limit: pagination.pageSize });
+            const body: any = response;
+            const list = Array.isArray(body?.data) ? body.data : Array.isArray(body?.data?.data) ? body.data.data : [];
+            const total = body?.total ?? body?.data?.total ?? list.length ?? 0;
+            return { list, total };
+        },
+        keepPreviousData: true,
+    });
+    const users = usersQuery.data?.list || [];
+    const loading = usersQuery.isFetching;
+    const total = usersQuery.data?.total ?? pagination.total;
 
     const handleCreate = () => {
         setEditingUser(null);
         form.resetFields();
+        form.setFieldsValue({ isActive: true });
         setModalVisible(true);
     };
 
@@ -52,40 +53,42 @@ const UserManagement: React.FC<UserManagementProps> = ({ onClose }) => {
         setModalVisible(true);
     };
 
-    const handleDelete = async (id: string) => {
-        try {
-            await usersApi.delete(id);
+    const deleteUser = useMutation({
+        mutationFn: (id: string) => usersGql.delete(id),
+        onSuccess: async () => {
             message.success('User deleted successfully');
-            loadUsers();
-        } catch (error) {
+            await queryClient.refetchQueries({ queryKey: ['users'] });
+        },
+        onError: (error) => {
+            console.error('[UserManagement] delete failed', error);
             message.error('Failed to delete user');
-        }
-    };
+        },
+    });
 
-    const handleSubmit = async (values: any) => {
-        try {
-            if (editingUser) {
-                await usersApi.update(editingUser.id, values);
-                message.success('User updated successfully');
-            } else {
-                await usersApi.create(values);
-                message.success('User created successfully');
-            }
-
+    const saveUser = useMutation({
+        mutationFn: ({ id, values }: { id?: string; values: any }) => {
+            if (id) return usersGql.update(id, values);
+            return usersGql.create(values as any);
+        },
+        onSuccess: async (_res, vars) => {
+            message.success(vars.id ? 'User updated successfully' : 'User created successfully');
             setModalVisible(false);
+            setEditingUser(null);
             form.resetFields();
-            loadUsers();
-        } catch (error: any) {
-            message.error(error.response?.data?.message || 'Operation failed');
-        }
-    };
+            await queryClient.refetchQueries({ queryKey: ['users'] });
+        },
+        onError: (error: any) => message.error(error.response?.data?.message || 'Operation failed'),
+    });
+
+    const handleDelete = (id: string) => deleteUser.mutate(id);
+    const handleSubmit = (values: any) => saveUser.mutate({ id: editingUser?.id, values });
 
     const handleSeed = async () => {
         setSeeding(true);
         try {
-            await seedersApi.seedUsers(seedCount);
+            await seedersGql.seedUsers(seedCount);
             message.success(`Successfully seeded ${seedCount} users!`);
-            loadUsers();
+            await queryClient.refetchQueries({ queryKey: ['users'] });
         } catch (error: any) {
             message.error(error.response?.data?.message || 'Failed to seed users');
         } finally {
@@ -145,7 +148,7 @@ const UserManagement: React.FC<UserManagementProps> = ({ onClose }) => {
                         prefix={<SearchOutlined />}
                         value={filters.search}
                         onChange={(e) => setFilters({ ...filters, search: e.target.value })}
-                        onPressEnter={loadUsers}
+                        onPressEnter={() => usersQuery.refetch()}
                     />
                 </Col>
                 <Col xs={24} sm={12} md={4}>
@@ -164,8 +167,13 @@ const UserManagement: React.FC<UserManagementProps> = ({ onClose }) => {
                     <Select
                         placeholder="Status"
                         allowClear
-                        value={filters.is_active !== undefined ? filters.is_active.toString() : undefined}
-                        onChange={(value) => setFilters({ ...filters, is_active: value !== undefined ? value === 'true' : undefined })}
+                        value={filters.is_active !== undefined ? String(filters.is_active) : undefined}
+                        onChange={(value) =>
+                            setFilters({
+                                ...filters,
+                                is_active: value === undefined ? undefined : value === 'true',
+                            })
+                        }
                         style={{ width: '100%' }}
                     >
                         <Option value="true">Active</Option>
@@ -209,6 +217,7 @@ const UserManagement: React.FC<UserManagementProps> = ({ onClose }) => {
                 rowKey="id"
                 pagination={{
                     ...pagination,
+                    total,
                     showSizeChanger: true,
                     showTotal: (total) => `Total ${total} users`,
                     onChange: (page, pageSize) => setPagination({ ...pagination, current: page, pageSize }),
@@ -254,7 +263,7 @@ const UserManagement: React.FC<UserManagementProps> = ({ onClose }) => {
                             <Option value="admin">Admin</Option>
                         </Select>
                     </Form.Item>
-                    <Form.Item name="isActive" label="Active" valuePropName="checked" initialValue={true}>
+                    <Form.Item name="isActive" label="Active" valuePropName="checked">
                         <Switch />
                     </Form.Item>
                 </Form>

@@ -7,6 +7,8 @@ import {
 } from '@nestjs/common';
 import { OrdersService } from '../../../infrastructure/services/orders/orders.service';
 import { JwtAuthGuard } from '../../../infrastructure/libs/guards/jwt-auth.guard';
+import { CurrentUser } from '../../../infrastructure/libs/decorators/current-user.decorator';
+import type { CurrentUserPayload } from '../../../infrastructure/libs/decorators/current-user.decorator';
 import { ApiController } from '../../../infrastructure/libs/swagger/api-docs.decorator';
 import { ApiOperation, ApiResponse, ApiBearerAuth } from '@nestjs/swagger';
 
@@ -37,6 +39,27 @@ export class OrderController {
       offset: offset ? parseInt(offset.toString(), 10) : undefined,
     });
     return result;
+  }
+
+  @UseGuards(JwtAuthGuard)
+  @Get('my-orders')
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'Get current user orders' })
+  @ApiResponse({ status: 200, description: 'List of user orders' })
+  async getMyOrders(
+    @CurrentUser() user: CurrentUserPayload,
+    @Query('status') status?: string,
+    @Query('fulfillment_status') fulfillmentStatus?: string,
+    @Query('limit') limit?: number,
+    @Query('offset') offset?: number,
+  ) {
+    return this.ordersService.findAll({
+      userId: user.id,
+      status,
+      fulfillmentStatus,
+      limit: limit ? parseInt(limit.toString(), 10) : undefined,
+      offset: offset ? parseInt(offset.toString(), 10) : undefined,
+    });
   }
 
   @UseGuards(JwtAuthGuard)

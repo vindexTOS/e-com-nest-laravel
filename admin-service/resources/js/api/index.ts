@@ -1,12 +1,11 @@
 export { nestjsAuthApi } from './nestjs/auth.api';
 export { nestjsUserApi } from './nestjs/user.api';
-export { laravelAuthApi } from './laravel/auth.api';
-export { laravelAdminApi } from './laravel/admin.api';
-export { productsApi } from './laravel/products.api';
-export { categoriesApi } from './laravel/categories.api';
-export { ordersApi } from './laravel/orders.api';
-export { usersApi } from './laravel/users.api';
-export { seedersApi } from './laravel/seeders.api';
+export { nestjsProductsApi } from './nestjs/products.api';
+export { nestjsCategoriesApi } from './nestjs/categories.api';
+export { nestjsOrdersApi } from './nestjs/orders.api';
+export { nestjsNotificationsApi } from './nestjs/notifications.api';
 export { default as nestjsClient } from './nestjs/client';
-export { default as laravelClient } from './laravel/client';
-
+export type { Product } from '../graphql/products';
+export type { Category } from '../graphql/categories';
+export type { Notification } from './nestjs/notifications.api';
+ 

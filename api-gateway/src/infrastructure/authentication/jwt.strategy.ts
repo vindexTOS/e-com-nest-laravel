@@ -2,9 +2,6 @@ import { Injectable, UnauthorizedException } from '@nestjs/common';
 import { PassportStrategy } from '@nestjs/passport';
 import { ExtractJwt, Strategy } from 'passport-jwt';
 import { ConfigService } from '@nestjs/config';
-import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
-import { User } from '../../domain/entities/user.entity';
 import { RedisService } from '../cache/redis.service';
 
 export interface JwtPayload {
@@ -19,14 +16,12 @@ export interface JwtPayload {
 export class JwtStrategy extends PassportStrategy(Strategy) {
   constructor(
     private configService: ConfigService,
-    @InjectRepository(User)
-    private userRepository: Repository<User>,
     private redisService: RedisService,
   ) {
     super({
       jwtFromRequest: ExtractJwt.fromAuthHeaderAsBearerToken(),
       ignoreExpiration: false,
-      secretOrKey: configService.get<string>('JWT_SECRET', 'TEST_SECRET'),
+      secretOrKey: 'TEST',
       passReqToCallback: true,
     });
   }
@@ -41,24 +36,12 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
       }
     }
 
-    const user = await this.userRepository.findOne({
-      where: { id: payload.sub },
-    });
-
-    if (!user) {
-      throw new UnauthorizedException('User not found');
-    }
-
-    if (!user.isActive) {
-      throw new UnauthorizedException('User account is inactive');
-    }
-
     return {
-      id: user.id,
-      email: user.email,
-      role: user.role,
-      firstName: user.firstName,
-      lastName: user.lastName,
+      id: payload.sub,
+      email: payload.email,
+      role: payload.role,
+      firstName: (payload as any).firstName ?? (payload as any).first_name ?? null,
+      lastName: (payload as any).lastName ?? (payload as any).last_name ?? null,
     };
   }
 }

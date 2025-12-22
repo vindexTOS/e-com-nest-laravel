@@ -1,37 +1,35 @@
-import React, { useEffect, useState } from 'react';
+import React, { useState } from 'react';
 import { Table, Button, Space, Input, Modal, Form, Upload, message, Tag, Popconfirm, Row, Col, Card, TreeSelect, Switch } from 'antd';
 import { PlusOutlined, EditOutlined, DeleteOutlined, UndoOutlined, UploadOutlined, SearchOutlined } from '@ant-design/icons';
-import { categoriesApi, Category } from '../../api';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { Category } from '../../api';
+import { categoriesGql } from '../../graphql';
+import { CategoryInput } from '../../graphql/categories';
 
 const { TextArea } = Input;
 
-interface CategoryManagementProps {
-    onClose?: () => void;
-}
-
-const CategoryManagement: React.FC<CategoryManagementProps> = ({ onClose }) => {
-    const [categories, setCategories] = useState<Category[]>([]);
-    const [loading, setLoading] = useState(false);
+const CategoryManagement: React.FC = () => {
+    const queryClient = useQueryClient();
     const [modalVisible, setModalVisible] = useState(false);
     const [editingCategory, setEditingCategory] = useState<Category | null>(null);
     const [form] = Form.useForm();
     const [filters, setFilters] = useState({ search: '', trashed: false });
 
-    useEffect(() => {
-        loadCategories();
-    }, [filters]);
-
-    const loadCategories = async () => {
-        setLoading(true);
-        try {
-            const response = await categoriesApi.getAll(filters);
-            setCategories(response.data.data || []);
-        } catch (error) {
-            message.error('Failed to load categories');
-        } finally {
-            setLoading(false);
-        }
-    };
+    const categoriesQuery = useQuery<Category[]>({
+        queryKey: ['categories', 'management', filters],
+        queryFn: async () => {
+            const response = await categoriesGql.getAll({
+                search: filters.search || undefined,
+                page: 1,
+                limit: 200,
+                parentId: undefined,
+            });
+            return response.data || [];
+        },
+        keepPreviousData: true,
+    });
+    const categories = categoriesQuery.data || [];
+    const loading = categoriesQuery.isFetching;
 
     const handleCreate = () => {
         setEditingCategory(null);
@@ -45,70 +43,69 @@ const CategoryManagement: React.FC<CategoryManagementProps> = ({ onClose }) => {
         setModalVisible(true);
     };
 
-    const handleDelete = async (id: string) => {
-        try {
-            await categoriesApi.delete(id);
+    const deleteCategory = useMutation({
+        mutationFn: (id: string) => categoriesGql.delete(id),
+        onSuccess: async () => {
             message.success('Category deleted successfully');
-            loadCategories();
-        } catch (error: any) {
-            message.error(error.response?.data?.message || 'Failed to delete category');
-        }
-    };
+            await queryClient.refetchQueries({ queryKey: ['categories'] });
+        },
+        onError: (error: any) => message.error(error.response?.data?.message || 'Failed to delete category'),
+    });
 
-    const handleRestore = async (id: string) => {
-        try {
-            await categoriesApi.restore(id);
+    const restoreCategory = useMutation({
+        mutationFn: (id: string) => categoriesGql.restore(id),
+        onSuccess: async () => {
             message.success('Category restored successfully');
-            loadCategories();
-        } catch (error) {
-            message.error('Failed to restore category');
-        }
-    };
+            await queryClient.refetchQueries({ queryKey: ['categories'] });
+        },
+        onError: () => message.error('Failed to restore category'),
+    });
 
-    const handleSubmit = async (values: any) => {
-        try {
-            const formData = new FormData();
-            Object.keys(values).forEach(key => {
-                if (key !== 'image' && values[key] !== undefined && values[key] !== null) {
-                    if (key === 'is_active') {
-                        formData.append(key, values[key] ? '1' : '0');
-                    } else {
-                        formData.append(key, values[key]);
-                    }
-                }
-            });
-
-            if (values.image && values.image.file) {
-                formData.append('image', values.image.file.originFileObj || values.image.file);
-            }
-
-            if (editingCategory) {
-                await categoriesApi.update(editingCategory.id, formData);
-                message.success('Category updated successfully');
-            } else {
-                await categoriesApi.create(formData);
-                message.success('Category created successfully');
-            }
-
+    const saveCategory = useMutation({
+        mutationFn: ({ id, values }: { id?: string; values: any }) => {
+            const imageFile = values.image?.file?.originFileObj || values.image?.file;
+            const input: CategoryInput = {
+                name: values.name,
+                description: values.description,
+                parent_id: values.parent_id || null,
+                is_active: values.is_active ?? true,
+                sort_order:
+                    values.sort_order === undefined || values.sort_order === null || values.sort_order === ''
+                        ? undefined
+                        : Number(values.sort_order),
+                meta_title: values.meta_title,
+                meta_description: values.meta_description,
+                image: imageFile || null,
+            };
+            if (id) return categoriesGql.update(id, input);
+            return categoriesGql.create(input);
+        },
+        onSuccess: async (_res, vars) => {
+            message.success(vars.id ? 'Category updated successfully' : 'Category created successfully');
             setModalVisible(false);
+            setEditingCategory(null);
             form.resetFields();
-            loadCategories();
-        } catch (error: any) {
-            message.error(error.response?.data?.message || 'Operation failed');
-        }
-    };
+            await queryClient.refetchQueries({ queryKey: ['categories'] });
+        },
+        onError: (error: any) => message.error(error.response?.data?.message || 'Operation failed'),
+    });
 
-    const buildTreeData = (cats: Category[]): any[] => {
-        return cats
-            .filter(cat => !cat.parent_id && !cat.deleted_at)
-            .map(cat => ({
-                title: cat.name,
-                value: cat.id,
-                children: cats
-                    .filter(child => child.parent_id === cat.id && !child.deleted_at)
-                    .map(child => ({ title: child.name, value: child.id })),
-            }));
-    };
+    const handleDelete = (id: string) => deleteCategory.mutate(id);
+    const handleRestore = (id: string) => restoreCategory.mutate(id);
+    const handleSubmit = (values: any) => saveCategory.mutate({ id: editingCategory?.id, values });
+
+    const buildTreeData = (cats: Category[] = []): any[] =>
+        Array.isArray(cats)
+            ? cats
+                  .filter(cat => !cat.parent_id && !cat.deleted_at)
+                  .map(cat => ({
+                      title: cat.name,
+                      value: cat.id,
+                      children: cats
+                          .filter(child => child.parent_id === cat.id && !child.deleted_at)
+                          .map(child => ({ title: child.name, value: child.id })),
+                  }))
+            : [];
 
     const columns = [
         {
@@ -167,7 +164,7 @@ const CategoryManagement: React.FC<CategoryManagementProps> = ({ onClose }) => {
                         prefix={<SearchOutlined />}
                         value={filters.search}
                         onChange={(e) => setFilters({ ...filters, search: e.target.value })}
-                        onPressEnter={loadCategories}
+                        onPressEnter={() => categoriesQuery.refetch()}
                     />
                 </Col>
                 <Col xs={24} sm={12} md={12}>

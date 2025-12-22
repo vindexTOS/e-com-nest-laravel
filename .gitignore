@@ -1,0 +1,23 @@
+# Environment files (contain secrets)
+.env
+.env.local
+.env.*.local
+
+# Keep the example template
+!.env.example
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
+
+# Node modules (handled by each service)
+node_modules/

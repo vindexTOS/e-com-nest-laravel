@@ -19,7 +19,8 @@ Hybrid e-commerce platform with Nest.js API Gateway and Laravel Admin Panel. Bui
 
 - **Nest.js API Gateway**: Core API with REST + GraphQL (Port 3000)
 - **Laravel Admin Panel**: Admin dashboard with React frontend (Port 8000)
-- **PostgreSQL**: Shared database
+- **PostgreSQL Write DB**: Primary database for writes (Port 5432)
+- **PostgreSQL Read DB**: Replica database for reads (Port 5433) - Replicated via Logical Replication
 - **Redis**: Caching, sessions, and queues
 
 ## NestJS Clean Architecture Overview
@@ -84,9 +85,159 @@ docker-compose up -d --build
 
 - **API Gateway**: http://localhost:3000
 - **Admin Panel**: http://localhost:8000
-- **API Docs (Swagger)**: http://localhost:3000/api/docs
-- **PostgreSQL**: localhost:5432
+- **PostgreSQL Write**: localhost:5432
+- **PostgreSQL Read**: localhost:5433
 - **Redis**: localhost:6379
+
+## Database Replication Setup
+
+The platform uses **PostgreSQL Logical Replication** to replicate data from the write database to the read database in real-time.
+
+### Architecture
+
+- **Write Database** (`postgres-write`): Used by Laravel admin service for all writes
+- **Read Database** (`postgres-read`): Used by NestJS API Gateway for reads (replicated from write DB)
+
+### Initial Setup
+
+1. **Start the databases:**
+   ```bash
+   docker-compose up -d postgres-write postgres-read
+   ```
+
+2. **Run migrations on write database:**
+   ```bash
+   docker-compose exec admin-service php artisan migrate
+   ```
+
+3. **Setup replication:**
+   ```bash
+   # Make scripts executable (if not already)
+   chmod +x postgres/*.sh
+   
+   # Run replication setup script
+   ./postgres/replicate.sh
+   ```
+
+### How It Works
+
+PostgreSQL Logical Replication uses Write-Ahead Log (WAL) streaming:
+- Changes in write database are automatically replicated to read database
+- Replication happens at the database level (no application code needed)
+- Real-time replication with minimal latency
+- Handles INSERT, UPDATE, DELETE operations automatically
+
+### Monitoring Replication
+
+Check replication status:
+```bash
+./postgres/check-replication.sh
+```
+
+Or manually:
+```bash
+# Check subscription status
+docker-compose exec postgres-read psql -U ecom_user -d ecom_db_read -c "SELECT * FROM pg_subscription;"
+
+# Check replication lag
+docker-compose exec postgres-read psql -U ecom_user -d ecom_db_read -c "SELECT * FROM pg_stat_subscription;"
+```
+
+### Adding New Tables
+
+When you add new tables via migrations:
+
+1. Run migrations on write database (Laravel)
+2. Refresh the subscription:
+   ```bash
+   docker-compose exec postgres-read psql -U ecom_user -d ecom_db_read -c "ALTER SUBSCRIPTION ecom_subscription REFRESH PUBLICATION;"
+   ```
+
+### Troubleshooting
+
+See `postgres/README.md` for detailed troubleshooting guide.
+
+**Quick fixes:**
+- **Replication not working**: Run `./postgres/replicate.sh` again
+- **Tables missing**: Refresh subscription (see above)
+- **Replication lag**: Check `pg_stat_subscription` for sync status
+
+## Nginx Reverse Proxy
+
+The application uses **Nginx** as a reverse proxy to route requests to the appropriate services. All services are accessible through `http://localhost` (port 80).
+
+### Nginx Configuration
+
+The Nginx configuration (`nginx/nginx.conf`) routes requests as follows:
+
+- **`/`** → Laravel Admin Service (frontend dashboard)
+- **`/api/admin-api/`** → Laravel Admin Service API endpoints
+- **`/api/gateway/`** → NestJS API Gateway endpoints
+- **`/api/documentation`** → Laravel Swagger documentation
+- **`/api/gateway/docs`** → NestJS API Gateway Swagger documentation
+
+### Routing Rules
+
+1. **Root Path (`/`)**: Serves the Laravel admin dashboard (React frontend)
+2. **Admin API (`/api/admin-api/*`)**: Proxies to Laravel admin service API
+3. **Gateway API (`/api/gateway/*`)**: Proxies to NestJS API Gateway
+4. **All other paths**: Default to Laravel admin service
+
+### Accessing Services Directly
+
+While Nginx handles routing, you can also access services directly:
+
+- **API Gateway**: http://localhost:3000 (internal Docker network)
+- **Admin Service**: http://localhost:8000 (internal Docker network)
+
+> **Note**: Direct access may not work from your host machine. Use `http://localhost` (port 80) for all access through Nginx.
+
+## Accessing the Application
+
+### Swagger Documentation
+
+#### API Gateway Swagger (NestJS)
+
+**Full URL**: http://localhost/api/gateway/docs
+
+- Complete API documentation for the NestJS API Gateway
+- Interactive API testing interface
+- Bearer token authentication support
+- All endpoints with request/response schemas
+
+#### Admin Service Swagger (Laravel)
+
+**Full URL**: http://localhost/api/documentation
+
+- Complete API documentation for the Laravel Admin Service
+- Interactive API testing interface
+- JWT token authentication support
+- Admin-specific endpoints documentation
+
+### Admin Dashboard
+
+**Full URL**: http://localhost/
+
+- React-based admin dashboard
+- Accessible at the root path
+- Requires admin authentication
+- Manage products, categories, orders, and users
+
+**Default Admin Credentials:**
+- **Email**: `admin@gmail.com`
+- **Password**: `1234567`
+
+### User/Customer Pages
+
+**Full URL**: http://localhost/
+
+The same React frontend serves both admin and customer views based on user role and authentication:
+
+- **Unauthenticated users**: Public pages (product catalog, product details)
+- **Authenticated customers**: Customer dashboard, order history, profile management
+- **Authenticated admins**: Admin dashboard with full management capabilities
+
+The frontend automatically detects user role and displays the appropriate interface.
 
 ### Default Admin Credentials
 

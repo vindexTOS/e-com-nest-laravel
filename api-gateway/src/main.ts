@@ -3,11 +3,14 @@ import { ValidationPipe } from '@nestjs/common';
 import { AppModule } from './app.module';
 import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
 import { HttpExceptionFilter } from './infrastructure/libs/filters/http-exception.filter';
+import { LoggingInterceptor } from './infrastructure/libs/interceptors/logging.interceptor';
+import { MicroserviceOptions, Transport } from '@nestjs/microservices';
 
 async function bootstrap() {
   const app = await NestFactory.create(AppModule);
 
   app.useGlobalFilters(new HttpExceptionFilter());
+  app.useGlobalInterceptors(new LoggingInterceptor());
   
   app.useGlobalPipes(
     new ValidationPipe({
@@ -32,6 +35,16 @@ async function bootstrap() {
   const document = SwaggerModule.createDocument(app, config);
   SwaggerModule.setup('docs', app, document);
 
-  await app.listen(process.env.PORT ?? 3000);
+  app.connectMicroservice<MicroserviceOptions>({
+    transport: Transport.REDIS,
+    options: {
+      host: process.env.REDIS_HOST || 'redis',
+      port: Number(process.env.REDIS_PORT) || 6379,
+    },
+  });
+  await app.startAllMicroservices();
+
+  
+  await app.listen(process.env.PORT ?? 3000, '0.0.0.0');
 }
 bootstrap();

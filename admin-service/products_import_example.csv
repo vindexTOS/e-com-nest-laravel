@@ -1,0 +1,12 @@
+name,sku,description,price,stock,status,category
+"Wireless Mouse","MOUSE-001","Ergonomic wireless mouse with 2.4GHz connectivity",29.99,50,active,"Electronics"
+"Mechanical Keyboard","KEYBOARD-001","RGB mechanical keyboard with Cherry MX switches",129.99,30,active,"Electronics"
+"USB-C Cable","CABLE-001","6ft USB-C to USB-C charging cable",12.99,100,active,"Accessories"
+"Laptop Stand","STAND-001","Adjustable aluminum laptop stand for ergonomic workspace",49.99,25,active,"Accessories"
+"Webcam HD","WEBCAM-001","1080p HD webcam with built-in microphone",79.99,15,active,"Electronics"
+"Desk Mat","MAT-001","Large desk mat with mouse pad area",24.99,40,active,"Accessories"
+"Monitor Stand","MONITOR-STAND-001","Dual monitor stand with adjustable height",89.99,20,active,"Accessories"
+"USB Hub","HUB-001","7-port USB 3.0 hub with power adapter",34.99,35,active,"Accessories"
+"Wireless Headphones","HEADPHONES-001","Noise-cancelling wireless headphones",199.99,10,active,"Electronics"
+"Laptop Sleeve","SLEEVE-001","Protective laptop sleeve for 15 inch laptops",19.99,60,active,"Accessories"
+

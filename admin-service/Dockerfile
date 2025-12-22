@@ -16,7 +16,10 @@ RUN apk add --no-cache \
     nodejs \
     npm
 
-RUN docker-php-ext-configure gd --with-freetype --with-jpeg \
+RUN apk add --no-cache $PHPIZE_DEPS \
+    && pecl install redis \
+    && docker-php-ext-enable redis \
+    && docker-php-ext-configure gd --with-freetype --with-jpeg \
     && docker-php-ext-install pdo_pgsql pgsql mbstring exif pcntl bcmath gd zip
 
 COPY --from=composer:latest /usr/bin/composer /usr/bin/composer
@@ -65,6 +68,8 @@ RUN apk add --no-cache --virtual .build-deps \
     postgresql-libs \
     freetype \
     libjpeg-turbo \
+    && pecl install redis \
+    && docker-php-ext-enable redis \
     && docker-php-ext-configure gd --with-freetype --with-jpeg \
     && docker-php-ext-install pdo_pgsql pgsql mbstring exif pcntl bcmath gd zip \
     && apk del .build-deps
@@ -79,6 +84,7 @@ COPY --from=build /var/www/html/public ./public
 COPY --from=build /var/www/html/resources ./resources
 COPY --from=build /var/www/html/routes ./routes
 COPY --from=build /var/www/html/storage ./storage
+COPY --from=build /var/www/html/graphql ./graphql
 COPY --from=build /var/www/html/artisan ./artisan
 COPY --from=build /var/www/html/composer.json ./composer.json
 COPY --from=build /var/www/html/composer.lock ./composer.lock
@@ -92,4 +98,4 @@ RUN chown -R www-data:www-data /var/www/html \
 
 EXPOSE 8000
 
-CMD sh -c "php artisan config:clear && php artisan cache:clear && rm -f /var/www/html/bootstrap/cache/config.php && php artisan storage:link || true && php artisan serve --host=0.0.0.0 --port=8000"
+CMD sh -c "php artisan config:clear && php artisan cache:clear && rm -f /var/www/html/bootstrap/cache/config.php && php artisan storage:link || true && until php artisan migrate --force --database=pgsql; do echo 'Waiting for write database...'; sleep 2; done && until php artisan migrate --force --database=read; do echo 'Waiting for read database...'; sleep 2; done && php artisan serve --host=0.0.0.0 --port=8000"

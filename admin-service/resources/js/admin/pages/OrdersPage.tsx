@@ -1,7 +1,9 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { Layout, Table, Button, Space, Input, Select, Card, Modal, Form, message, Tag, Popconfirm, DatePicker, Row, Col } from 'antd';
 import { EditOutlined, DeleteOutlined, UndoOutlined, CheckCircleOutlined, SearchOutlined, DownloadOutlined } from '@ant-design/icons';
-import { ordersApi, Order } from '../../api';
+import { useMutation, useQueryClient } from '@tanstack/react-query';
+import { ordersGql } from '../../graphql';
+import { io, Socket } from 'socket.io-client';
 import AdminLayout from '../components/AdminLayout';
 import dayjs from 'dayjs';
 
@@ -9,9 +11,24 @@ const { Content } = Layout;
 const { RangePicker } = DatePicker;
 const { Option } = Select;
 
+interface Order {
+    id: string;
+    order_number?: string;
+    orderNumber?: string;
+    user?: { email?: string };
+    status?: string;
+    fulfillment_status?: string;
+    fulfillmentStatus?: string;
+    total?: number;
+    created_at?: string;
+    createdAt?: string;
+    deleted_at?: string;
+    deletedAt?: string;
+    items?: any[];
+}
+
 const OrdersPage: React.FC = () => {
-    const [orders, setOrders] = useState<Order[]>([]);
-    const [loading, setLoading] = useState(false);
+    const queryClient = useQueryClient();
     const [modalVisible, setModalVisible] = useState(false);
     const [editingOrder, setEditingOrder] = useState<Order | null>(null);
     const [form] = Form.useForm();
@@ -24,87 +41,128 @@ const OrdersPage: React.FC = () => {
         trashed: false,
     });
     const [pagination, setPagination] = useState({ current: 1, pageSize: 10, total: 0 });
+    const [orders, setOrders] = useState<Order[]>([]);
+    const [loading, setLoading] = useState(false);
+    const socketRef = useRef<Socket | null>(null);
+
+    const requestOrders = (emitFilters = filters, emitPagination = pagination) => {
+        if (!socketRef.current) return;
+        setLoading(true);
+        socketRef.current.emit('orders:get', {
+            status: emitFilters.status || undefined,
+            fulfillmentStatus: emitFilters.fulfillment_status || undefined,
+            orderNumber: emitFilters.order_number || undefined,
+            page: emitPagination.current,
+            limit: emitPagination.pageSize,
+            withDeleted: emitFilters.trashed || undefined,
+        });
+    };
 
     useEffect(() => {
-        loadOrders();
-    }, [filters, pagination.current]);
+        const envUrl = (import.meta as any).env?.VITE_SOCKET_URL;
+        const defaultUrl = typeof window !== 'undefined' ? window.location.origin : 'http://localhost';
+        const socketUrl = (envUrl || defaultUrl).replace(/\/+$/, '');
+        const socket = io(`${socketUrl}/ws`, {
+            path: '/socket.io',
+            transports: ['websocket'],
+        });
+        socketRef.current = socket;
 
-    const loadOrders = async () => {
-        setLoading(true);
-        try {
-            const response = await ordersApi.getAll({
-                ...filters,
-                limit: pagination.pageSize,
-            });
-            setOrders(response.data.data || []);
-            setPagination(prev => ({ ...prev, total: response.data.total || 0 }));
-        } catch (error) {
-            message.error('Failed to load orders');
-        } finally {
+        const handleOrdersList = (payload: { success?: boolean; data?: Order[]; total?: number }) => {
+            if (payload.success !== false) {
+                const normalizedOrders = (payload?.data || []).map(order => ({
+                    ...order,
+                    order_number: order.order_number || order.orderNumber,
+                    fulfillment_status: order.fulfillment_status || order.fulfillmentStatus,
+                    created_at: order.created_at || order.createdAt,
+                    deleted_at: order.deleted_at || order.deletedAt,
+                }));
+                setOrders(normalizedOrders);
+                setPagination(prev => ({ ...prev, total: payload?.total ?? prev.total }));
+            }
             setLoading(false);
-        }
-    };
+        };
+
+        const handleOrderUpdated = () => {
+            requestOrders();
+        };
+
+        socket.on('connect', () => {
+            requestOrders();
+        });
+        socket.on('orders:list', handleOrdersList);
+        socket.on('orders:updated', handleOrderUpdated);
+        socket.on('connect_error', (err) => {
+            console.error('Socket connection error', err);
+            setLoading(false);
+        });
+
+        return () => {
+            socket.off('orders:list', handleOrdersList);
+            socket.off('orders:updated', handleOrderUpdated);
+            socket.disconnect();
+            socketRef.current = null;
+        };
+    }, []);
+
+    useEffect(() => {
+        requestOrders();
+    }, [filters, pagination.current, pagination.pageSize]);
 
     const handleEdit = (order: Order) => {
         setEditingOrder(order);
-        form.setFieldsValue(order);
+        form.setFieldsValue({
+            status: order.status,
+            fulfillment_status: order.fulfillment_status,
+        });
         setModalVisible(true);
     };
 
-    const handleDelete = async (id: string) => {
-        try {
-            await ordersApi.delete(id);
+    const deleteOrder = useMutation({
+        mutationFn: (id: string) => ordersGql.delete(id),
+        onSuccess: async () => {
             message.success('Order deleted successfully');
-            loadOrders();
-        } catch (error) {
-            message.error('Failed to delete order');
-        }
-    };
+            requestOrders();
+        },
+        onError: () => message.error('Failed to delete order'),
+    });
 
-    const handleRestore = async (id: string) => {
-        try {
-            await ordersApi.restore(id);
+    const restoreOrder = useMutation({
+        mutationFn: (id: string) => ordersGql.restore(id),
+        onSuccess: async () => {
             message.success('Order restored successfully');
-            loadOrders();
-        } catch (error) {
-            message.error('Failed to restore order');
-        }
-    };
+            requestOrders();
+        },
+        onError: () => message.error('Failed to restore order'),
+    });
 
-    const handleFulfill = async (id: string) => {
-        try {
-            await ordersApi.fulfill(id);
+    const fulfillOrder = useMutation({
+        mutationFn: (id: string) => ordersGql.fulfill(id),
+        onSuccess: async () => {
             message.success('Order fulfilled successfully');
-            loadOrders();
-        } catch (error: any) {
-            message.error(error.response?.data?.message || 'Failed to fulfill order');
-        }
-    };
+            requestOrders();
+        },
+        onError: (error: any) => message.error(error.response?.data?.message || 'Failed to fulfill order'),
+    });
 
-    const handleSubmit = async (values: any) => {
-        try {
-            await ordersApi.update(editingOrder!.id, values);
+    const updateOrder = useMutation({
+        mutationFn: ({ id, values }: { id: string; values: any }) => ordersGql.update(id, values),
+        onSuccess: async () => {
             message.success('Order updated successfully');
             setModalVisible(false);
             form.resetFields();
-            loadOrders();
-        } catch (error: any) {
-            message.error(error.response?.data?.message || 'Operation failed');
-        }
-    };
+            requestOrders();
+        },
+        onError: (error: any) => message.error(error.response?.data?.message || 'Operation failed'),
+    });
+
+    const handleDelete = (id: string) => deleteOrder.mutate(id);
+    const handleRestore = (id: string) => restoreOrder.mutate(id);
+    const handleFulfill = (id: string) => fulfillOrder.mutate(id);
+    const handleSubmit = (values: any) => updateOrder.mutate({ id: editingOrder!.id, values });
 
     const handleExport = async () => {
-        try {
-            const blob = await ordersApi.export('csv');
-            const url = window.URL.createObjectURL(blob);
-            const a = document.createElement('a');
-            a.href = url;
-            a.download = `orders_${new Date().toISOString().split('T')[0]}.csv`;
-            a.click();
-            message.success('Export started');
-        } catch (error) {
-            message.error('Failed to export orders');
-        }
+        message.warning('Export is not available for the socket backend');
     };
 
     const columns = [
@@ -151,7 +209,7 @@ const OrdersPage: React.FC = () => {
             title: 'Total',
             dataIndex: 'total',
             key: 'total',
-            render: (total: number) => `$${total.toFixed(2)}`,
+            render: (total: any) => `$${Number(total ?? 0).toFixed(2)}`,
         },
         {
             title: 'Date',
@@ -195,7 +253,7 @@ const OrdersPage: React.FC = () => {
                                 prefix={<SearchOutlined />}
                                 value={filters.order_number}
                                 onChange={(e) => setFilters({ ...filters, order_number: e.target.value })}
-                                onPressEnter={loadOrders}
+                                onPressEnter={() => requestOrders()}
                             />
                         </Col>
                         <Col xs={24} sm={12} md={4}>
@@ -261,6 +319,7 @@ const OrdersPage: React.FC = () => {
                         rowKey="id"
                         pagination={{
                             ...pagination,
+                            total: pagination.total,
                             onChange: (page, pageSize) => setPagination({ ...pagination, current: page, pageSize }),
                         }}
                         expandable={{
@@ -270,7 +329,7 @@ const OrdersPage: React.FC = () => {
                                     <ul>
                                         {record.items?.map((item: any) => (
                                             <li key={item.id}>
-                                                {item.product_name} x{item.quantity} - ${item.total_price.toFixed(2)}
+                                                {item.product_name || item.productName} x{item.quantity} - ${Number(item.total_price || item.totalPrice || 0).toFixed(2)}
                                             </li>
                                         ))}
                                     </ul>
@@ -320,4 +379,3 @@ const OrdersPage: React.FC = () => {
 };
 
 export default OrdersPage;
-

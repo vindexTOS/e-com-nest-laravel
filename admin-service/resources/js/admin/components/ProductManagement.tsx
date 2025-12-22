@@ -1,7 +1,11 @@
-import React, { useEffect, useState } from 'react';
+import React, { useState } from 'react';
 import { Table, Button, Space, Input, InputNumber, Select, Modal, Form, Upload, message, Tag, Popconfirm, Row, Col, Card } from 'antd';
 import { PlusOutlined, EditOutlined, DeleteOutlined, UndoOutlined, UploadOutlined, DownloadOutlined, SearchOutlined, DatabaseOutlined } from '@ant-design/icons';
-import { productsApi, categoriesApi, seedersApi, Product, Category } from '../../api';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { nestjsProductsApi, Product, Category } from '../../api';
+import { productsGql, categoriesGql, seedersGql } from '../../graphql';
+import { getImageUrl } from '../../shared/utils/imageUtils';
+import { exportToCSV } from '../../shared/utils/exportUtils';
 
 const { Option } = Select;
 
@@ -10,9 +14,7 @@ interface ProductManagementProps {
 }
 
 const ProductManagement: React.FC<ProductManagementProps> = ({ onClose }) => {
-    const [products, setProducts] = useState<Product[]>([]);
-    const [categories, setCategories] = useState<Category[]>([]);
-    const [loading, setLoading] = useState(false);
+    const queryClient = useQueryClient();
     const [modalVisible, setModalVisible] = useState(false);
     const [editingProduct, setEditingProduct] = useState<Product | null>(null);
     const [form] = Form.useForm();
@@ -21,35 +23,34 @@ const ProductManagement: React.FC<ProductManagementProps> = ({ onClose }) => {
     const [seeding, setSeeding] = useState(false);
     const [seedCount, setSeedCount] = useState(10);
 
-    useEffect(() => {
-        loadCategories();
-        loadProducts();
-    }, [filters, pagination.current]);
+    const categoriesQuery = useQuery<Category[]>({
+        queryKey: ['categories', 'product-management'],
+        queryFn: async () => {
+            const response = await categoriesGql.getAll({ page: 1, limit: 100, parentId: 'null' });
+            return response.data || [];
+        },
+    });
 
-    const loadCategories = async () => {
-        try {
-            const response = await categoriesApi.getAll({ root_only: true });
-            setCategories(response.data.data || []);
-        } catch (error) {
-            console.error('Failed to load categories:', error);
-        }
-    };
-
-    const loadProducts = async () => {
-        setLoading(true);
-        try {
-            const response = await productsApi.getAll({
-                ...filters,
-                per_page: pagination.pageSize,
+    const productsQuery = useQuery({
+        queryKey: ['products', 'management', filters, pagination.current, pagination.pageSize],
+        queryFn: async () => {
+            const response = await nestjsProductsApi.getAll({
+                search: filters.search,
+                status: filters.status,
+                category_id: filters.category_id,
+                trashed: filters.trashed,
+                limit: pagination.pageSize,
+                page: pagination.current,
             });
-            setProducts(response.data.data || []);
-            setPagination(prev => ({ ...prev, total: response.data.total || 0 }));
-        } catch (error) {
-            message.error('Failed to load products');
-        } finally {
-            setLoading(false);
-        }
-    };
+            const body = response.data;
+            return body;
+        },
+        keepPreviousData: true,
+    });
+    const products = productsQuery.data?.data || [];
+    const loading = productsQuery.isFetching;
+    const categories = categoriesQuery.data || [];
+    const total = productsQuery.data?.total ?? pagination.total;
 
     const handleCreate = () => {
         setEditingProduct(null);
@@ -63,74 +64,93 @@ const ProductManagement: React.FC<ProductManagementProps> = ({ onClose }) => {
         setModalVisible(true);
     };
 
-    const handleDelete = async (id: string) => {
-        try {
-            await productsApi.delete(id);
-            message.success('Product deleted successfully');
-            loadProducts();
-        } catch (error) {
-            message.error('Failed to delete product');
-        }
-    };
-
-    const handleRestore = async (id: string) => {
-        try {
-            await productsApi.restore(id);
-            message.success('Product restored successfully');
-            loadProducts();
-        } catch (error) {
-            message.error('Failed to restore product');
-        }
-    };
-
-    const handleSubmit = async (values: any) => {
-        try {
-            const formData = new FormData();
-            Object.keys(values).forEach(key => {
-                if (key !== 'image' && values[key] !== undefined && values[key] !== null) {
-                    formData.append(key, values[key]);
-                }
-            });
-
-            if (values.image && values.image.file) {
-                formData.append('image', values.image.file.originFileObj || values.image.file);
-            }
-
-            if (editingProduct) {
-                await productsApi.update(editingProduct.id, formData);
-                message.success('Product updated successfully');
-            } else {
-                await productsApi.create(formData);
-                message.success('Product created successfully');
-            }
-
+    const saveProduct = useMutation({
+        mutationFn: ({ id, values }: { id?: string; values: any }) => {
+            const imageFile = values.image?.file?.originFileObj || values.image?.file;
+            const input = {
+                name: values.name,
+                description: values.description,
+                sku: values.sku,
+                price: Number(values.price),
+                compare_at_price: values.compare_at_price ? Number(values.compare_at_price) : undefined,
+                cost_price: values.cost_price ? Number(values.cost_price) : undefined,
+                stock: values.stock !== undefined && values.stock !== null ? Number(values.stock) : undefined,
+                low_stock_threshold: values.low_stock_threshold !== undefined && values.low_stock_threshold !== null ? Number(values.low_stock_threshold) : undefined,
+                weight: values.weight !== undefined && values.weight !== null ? Number(values.weight) : undefined,
+                status: values.status,
+                is_featured: values.is_featured ?? false,
+                meta_title: values.meta_title,
+                meta_description: values.meta_description,
+                category_id: values.category_id || undefined,
+                image: imageFile || null,
+            };
+            if (id) return productsGql.update(id, input);
+            return productsGql.create(input);
+        },
+        onSuccess: async (_res, vars) => {
+            message.success(vars.id ? 'Product updated successfully' : 'Product created successfully');
             setModalVisible(false);
+            setEditingProduct(null);
             form.resetFields();
-            loadProducts();
-        } catch (error: any) {
-            message.error(error.response?.data?.message || 'Operation failed');
-        }
-    };
+            await queryClient.refetchQueries({ queryKey: ['products'] });
+        },
+        onError: (error: any) => message.error(error.response?.data?.message || 'Operation failed'),
+    });
 
-    const handleImport = async (file: File) => {
-        try {
-            await productsApi.import(file);
+    const deleteProduct = useMutation({
+        mutationFn: (id: string) => productsGql.delete(id),
+        onSuccess: async () => {
+            message.success('Product deleted successfully');
+            await queryClient.refetchQueries({ queryKey: ['products'] });
+        },
+        onError: () => message.error('Failed to delete product'),
+    });
+
+    const restoreProduct = useMutation({
+        mutationFn: (id: string) => productsGql.restore(id),
+        onSuccess: async () => {
+            message.success('Product restored successfully');
+            await queryClient.refetchQueries({ queryKey: ['products'] });
+        },
+        onError: () => message.error('Failed to restore product'),
+    });
+
+    const importProducts = useMutation({
+        mutationFn: (file: File) => productsGql.importProducts(file),
+        onSuccess: async () => {
             message.success('Import queued successfully');
-            loadProducts();
-        } catch (error) {
-            message.error('Failed to import products');
-        }
-    };
+            await queryClient.refetchQueries({ queryKey: ['products'] });
+        },
+        onError: () => message.error('Failed to import products'),
+    });
 
     const handleExport = async () => {
         try {
-            const blob = await productsApi.export();
-            const url = window.URL.createObjectURL(blob);
-            const a = document.createElement('a');
-            a.href = url;
-            a.download = `products_${new Date().toISOString().split('T')[0]}.csv`;
-            a.click();
-            message.success('Export started');
+            if (!products || products.length === 0) {
+                message.warning('No products to export');
+                return;
+            }
+
+            const exportData = products.map((product: any) => ({
+                Name: product.name || '',
+                SKU: product.sku || '',
+                Description: product.description || '',
+                Price: product.price || 0,
+                Stock: product.stock || 0,
+                Status: product.status || '',
+                Category: product.category?.name || '',
+                'Low Stock Threshold': product.lowStockThreshold || product.low_stock_threshold || 0,
+                Weight: product.weight || '',
+                'Compare At Price': product.compareAtPrice || product.compare_at_price || '',
+                'Cost Price': product.costPrice || product.cost_price || '',
+                Featured: product.isFeatured || product.is_featured ? 'Yes' : 'No',
+            }));
+
+            exportToCSV(exportData, `products_export_${new Date().toISOString().split('T')[0]}`, [
+                'Name', 'SKU', 'Description', 'Price', 'Stock', 'Status', 'Category',
+                'Low Stock Threshold', 'Weight', 'Compare At Price', 'Cost Price', 'Featured'
+            ]);
+            message.success('Products exported to CSV');
         } catch (error) {
             message.error('Failed to export products');
         }
@@ -139,33 +159,27 @@ const ProductManagement: React.FC<ProductManagementProps> = ({ onClose }) => {
     const handleSeed = async () => {
         setSeeding(true);
         try {
-            await productsApi.import(new File([], 'seed'));
-            // Use seeder API instead
-            const { seedersApi } = await import('../../api');
-            await seedersApi.seedProducts(seedCount);
-            message.success(`Successfully seeded ${seedCount} products!`);
-            loadProducts();
+            await seedersGql.seedProducts(seedCount);
+            message.success(`Seeded ${seedCount} products`);
+            await queryClient.refetchQueries({ queryKey: ['products'] });
         } catch (error: any) {
-            // Try direct seeder API
-            try {
-                const { seedersApi } = await import('../../api');
-                await seedersApi.seedProducts(seedCount);
-                message.success(`Successfully seeded ${seedCount} products!`);
-                loadProducts();
-            } catch (e: any) {
-                message.error(e.response?.data?.message || 'Failed to seed products');
-            }
+            message.error(error.response?.data?.message || 'Failed to seed products');
         } finally {
             setSeeding(false);
         }
     };
+
+    const handleDelete = (id: string) => deleteProduct.mutate(id);
+    const handleRestore = (id: string) => restoreProduct.mutate(id);
+    const handleSubmit = (values: any) => saveProduct.mutate({ id: editingProduct?.id, values });
+    const handleImport = async (file: File) => importProducts.mutateAsync(file);
 
     const columns = [
         {
             title: 'Image',
             dataIndex: 'image',
             key: 'image',
-            render: (image: string) => image ? <img src={image} alt="" style={{ width: 50, height: 50, objectFit: 'cover' }} /> : '-',
+            render: (image: string) => image ? <img src={getImageUrl(image) || ''} alt="" style={{ width: 50, height: 50, objectFit: 'cover' }} /> : '-',
         },
         {
             title: 'Name',
@@ -181,7 +195,10 @@ const ProductManagement: React.FC<ProductManagementProps> = ({ onClose }) => {
             title: 'Price',
             dataIndex: 'price',
             key: 'price',
-            render: (price: number) => `$${price.toFixed(2)}`,
+            render: (price: any) => {
+                const num = Number(price ?? 0);
+                return `$${isNaN(num) ? '0.00' : num.toFixed(2)}`;
+            },
         },
         {
             title: 'Stock',
@@ -206,12 +223,14 @@ const ProductManagement: React.FC<ProductManagementProps> = ({ onClose }) => {
         {
             title: 'Actions',
             key: 'actions',
-            render: (_: any, record: Product) => (
+            render: (_: any, record: Product) => {
+                const isDeleted = (record as any).deletedAt || record.deleted_at;
+                return (
                 <Space>
                     <Button icon={<EditOutlined />} onClick={() => handleEdit(record)} />
-                    {record.deleted_at ? (
+                        {isDeleted ? (
                         <Popconfirm title="Restore this product?" onConfirm={() => handleRestore(record.id)}>
-                            <Button icon={<UndoOutlined />} />
+                                <Button icon={<UndoOutlined />} type="primary">Restore</Button>
                         </Popconfirm>
                     ) : (
                         <Popconfirm title="Delete this product?" onConfirm={() => handleDelete(record.id)}>
@@ -219,7 +238,8 @@ const ProductManagement: React.FC<ProductManagementProps> = ({ onClose }) => {
                         </Popconfirm>
                     )}
                 </Space>
-            ),
+                );
+            },
         },
     ];
 
@@ -232,7 +252,7 @@ const ProductManagement: React.FC<ProductManagementProps> = ({ onClose }) => {
                         prefix={<SearchOutlined />}
                         value={filters.search}
                         onChange={(e) => setFilters({ ...filters, search: e.target.value })}
-                        onPressEnter={loadProducts}
+                        onPressEnter={() => productsQuery.refetch()}
                     />
                 </Col>
                 <Col xs={24} sm={12} md={4}>
@@ -314,6 +334,7 @@ const ProductManagement: React.FC<ProductManagementProps> = ({ onClose }) => {
                 rowKey="id"
                 pagination={{
                     ...pagination,
+                    total,
                     showSizeChanger: true,
                     showTotal: (total) => `Total ${total} products`,
                     onChange: (page, pageSize) => setPagination({ ...pagination, current: page, pageSize }),
@@ -349,14 +370,14 @@ const ProductManagement: React.FC<ProductManagementProps> = ({ onClose }) => {
                             </Form.Item>
                         </Col>
                         <Col span={12}>
-                            <Form.Item name="price" label="Price" rules={[{ required: true, type: 'number' }]}>
+                            <Form.Item name="price" label="Price"   >
                                 <Input type="number" step="0.01" />
                             </Form.Item>
                         </Col>
                     </Row>
                     <Row gutter={16}>
                         <Col span={12}>
-                            <Form.Item name="stock" label="Stock" rules={[{ type: 'number' }]}>
+                            <Form.Item name="stock" label="Stock"  >
                                 <Input type="number" />
                             </Form.Item>
                         </Col>

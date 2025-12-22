@@ -1,0 +1,362 @@
+scalar DateTime @scalar(class: "Nuwave\\Lighthouse\\Schema\\Types\\Scalars\\DateTime")
+scalar Upload @scalar(class: "Nuwave\\Lighthouse\\Schema\\Types\\Scalars\\Upload")
+
+type MessageResponse {
+  message: String!
+}
+
+type TokenPair {
+  accessToken: String!
+  refreshToken: String!
+}
+
+type AuthPayload {
+  accessToken: String!
+  refreshToken: String!
+  user: User!
+}
+
+type Query {
+  adminUser: User!
+    @field(resolver: "App\\GraphQL\\Queries\\AdminQuery@me")
+}
+
+type Mutation {
+  register(input: RegisterInput!): AuthPayload!
+    @field(resolver: "App\\GraphQL\\Mutations\\AuthMutator@register")
+  login(input: LoginInput!): AuthPayload!
+    @field(resolver: "App\\GraphQL\\Mutations\\AuthMutator@login")
+  adminLogin(input: LoginInput!): AuthPayload!
+    @field(resolver: "App\\GraphQL\\Mutations\\AuthMutator@adminLogin")
+  refreshToken(refreshToken: String!): TokenPair!
+    @field(resolver: "App\\GraphQL\\Mutations\\AuthMutator@refresh")
+  logout(refreshToken: String): MessageResponse!
+    @field(resolver: "App\\GraphQL\\Mutations\\AuthMutator@logout")
+
+  createCategory(input: CreateCategoryInput!): Category!
+    @field(resolver: "App\\GraphQL\\Mutations\\CategoryMutator@create")
+  updateCategory(id: ID!, input: UpdateCategoryInput!): Category!
+    @field(resolver: "App\\GraphQL\\Mutations\\CategoryMutator@update")
+  deleteCategory(id: ID!): MessageResponse!
+    @field(resolver: "App\\GraphQL\\Mutations\\CategoryMutator@delete")
+  restoreCategory(id: ID!): MessageResponse!
+    @field(resolver: "App\\GraphQL\\Mutations\\CategoryMutator@restore")
+
+  createProduct(input: CreateProductInput!): Product!
+    @field(resolver: "App\\GraphQL\\Mutations\\ProductMutator@create")
+  updateProduct(id: ID!, input: UpdateProductInput!): Product!
+    @field(resolver: "App\\GraphQL\\Mutations\\ProductMutator@update")
+  deleteProduct(id: ID!): MessageResponse!
+    @field(resolver: "App\\GraphQL\\Mutations\\ProductMutator@delete")
+  restoreProduct(id: ID!): MessageResponse!
+    @field(resolver: "App\\GraphQL\\Mutations\\ProductMutator@restore")
+  bulkDeleteProducts(ids: [ID!]!): MessageResponse!
+    @field(resolver: "App\\GraphQL\\Mutations\\BulkOperationMutator@bulkDelete")
+  bulkUpdateProducts(ids: [ID!]!, data: ProductBulkUpdateInput!): MessageResponse!
+    @field(resolver: "App\\GraphQL\\Mutations\\BulkOperationMutator@bulkUpdate")
+  importProducts(file: Upload!): MessageResponse!
+    @field(resolver: "App\\GraphQL\\Mutations\\BulkOperationMutator@importProducts")
+
+  createOrder(input: CreateOrderInput!): Order!
+    @field(resolver: "App\\GraphQL\\Mutations\\OrderMutator@create")
+  updateOrder(id: ID!, input: UpdateOrderInput!): Order!
+    @field(resolver: "App\\GraphQL\\Mutations\\OrderMutator@update")
+  fulfillOrder(id: ID!): Order!
+    @field(resolver: "App\\GraphQL\\Mutations\\OrderMutator@fulfill")
+  deleteOrder(id: ID!): MessageResponse!
+    @field(resolver: "App\\GraphQL\\Mutations\\OrderMutator@delete")
+  restoreOrder(id: ID!): MessageResponse!
+    @field(resolver: "App\\GraphQL\\Mutations\\OrderMutator@restore")
+
+  createUser(input: CreateUserInput!): User!
+    @field(resolver: "App\\GraphQL\\Mutations\\UserMutator@create")
+  updateUser(id: ID!, input: UpdateUserInput!): User!
+    @field(resolver: "App\\GraphQL\\Mutations\\UserMutator@update")
+  deleteUser(id: ID!): MessageResponse!
+    @field(resolver: "App\\GraphQL\\Mutations\\UserMutator@delete")
+  restoreUser(id: ID!): MessageResponse!
+    @field(resolver: "App\\GraphQL\\Mutations\\UserMutator@restore")
+
+  seedProducts(count: Int): MessageResponse!
+    @field(resolver: "App\\GraphQL\\Mutations\\SeederMutator@seedProducts")
+  seedUsers(count: Int): MessageResponse!
+    @field(resolver: "App\\GraphQL\\Mutations\\SeederMutator@seedUsers")
+  
+  uploadProductImage(file: Upload!): ImageUploadResponse!
+    @field(resolver: "App\\GraphQL\\Mutations\\ImageMutator@uploadProductImage")
+
+  addBalance(input: AddBalanceInput!): BalanceResponse!
+    @field(resolver: "App\\GraphQL\\Mutations\\BalanceMutator@addBalance")
+  
+  getMyBalance: BalanceResponse!
+    @field(resolver: "App\\GraphQL\\Mutations\\BalanceMutator@getBalance")
+
+  markNotificationAsRead(id: ID!): Notification!
+    @field(resolver: "App\\GraphQL\\Mutations\\NotificationMutator@markAsRead")
+  markAllNotificationsAsRead: MarkAllNotificationsAsReadResponse!
+    @field(resolver: "App\\GraphQL\\Mutations\\NotificationMutator@markAllAsRead")
+}
+
+input AddBalanceInput {
+  amount: Float!
+  card_number: String!
+  card_expiry: String!
+  card_cvv: String!
+}
+
+type User {
+  id: ID!
+  email: String!
+  first_name: String
+  last_name: String
+  phone: String
+  role: String
+  is_active: Boolean
+  balance: Float
+  created_at: DateTime
+  updated_at: DateTime
+}
+
+type BalanceResponse {
+  balance: Float!
+  message: String!
+}
+
+type Category {
+  id: ID!
+  name: String!
+  description: String
+  parent_id: ID
+  image: String
+  slug: String
+  is_active: Boolean
+  sort_order: Int
+  meta_title: String
+  meta_description: String
+  created_at: DateTime
+  updated_at: DateTime
+  deleted_at: DateTime
+}
+
+type Product {
+  id: ID!
+  name: String!
+  description: String
+  sku: String
+  price: Float
+  compare_at_price: Float
+  cost_price: Float
+  stock: Int
+  low_stock_threshold: Int
+  weight: Float
+  status: String
+  is_featured: Boolean
+  meta_title: String
+  meta_description: String
+  category_id: ID
+  slug: String
+  image: String
+  created_at: DateTime
+  updated_at: DateTime
+  deleted_at: DateTime
+}
+
+type OrderItem {
+  id: ID!
+  product_id: ID!
+  product_name: String
+  product_sku: String
+  quantity: Int
+  unit_price: Float
+  total_price: Float
+  quantity_fulfilled: Int
+}
+
+type Order {
+  id: ID!
+  user_id: ID!
+  order_number: String
+  status: String
+  fulfillment_status: String
+  payment_status: String
+  subtotal: Float
+  tax: Float
+  shipping: Float
+  discount: Float
+  total: Float
+  currency: String
+  shipping_address: String
+  billing_address: String
+  payment_method: String
+  notes: String
+  fulfilled_at: DateTime
+  shipped_at: DateTime
+  delivered_at: DateTime
+  created_at: DateTime
+  updated_at: DateTime
+  deleted_at: DateTime
+  user: User
+  items: [OrderItem!]!
+}
+
+input RegisterInput {
+  email: String!
+  password: String!
+  firstName: String!
+  lastName: String!
+  phone: String
+}
+
+input LoginInput {
+  email: String!
+  password: String!
+}
+
+input CreateCategoryInput {
+  name: String!
+  description: String
+  parent_id: ID
+  image: Upload
+  is_active: Boolean
+  sort_order: Int
+  meta_title: String
+  meta_description: String
+}
+
+input UpdateCategoryInput {
+  name: String
+  description: String
+  parent_id: ID
+  image: Upload
+  is_active: Boolean
+  sort_order: Int
+  meta_title: String
+  meta_description: String
+}
+
+input CreateProductInput {
+  name: String!
+  description: String
+  image: Upload
+  sku: String!
+  price: Float!
+  compare_at_price: Float
+  cost_price: Float
+  stock: Int
+  low_stock_threshold: Int
+  weight: Float
+  status: String
+  is_featured: Boolean
+  meta_title: String
+  meta_description: String
+  category_id: ID
+  slug: String
+}
+
+input UpdateProductInput {
+  name: String
+  description: String
+  image: Upload
+  sku: String
+  price: Float
+  compare_at_price: Float
+  cost_price: Float
+  stock: Int
+  low_stock_threshold: Int
+  weight: Float
+  status: String
+  is_featured: Boolean
+  meta_title: String
+  meta_description: String
+  category_id: ID
+  slug: String
+}
+
+input ProductBulkUpdateInput {
+  name: String
+  description: String
+  sku: String
+  price: Float
+  compare_at_price: Float
+  cost_price: Float
+  stock: Int
+  low_stock_threshold: Int
+  weight: Float
+  status: String
+  is_featured: Boolean
+  meta_title: String
+  meta_description: String
+  category_id: ID
+  slug: String
+}
+
+input OrderItemInput {
+  product_id: ID!
+  quantity: Int!
+}
+
+input CreateOrderInput {
+  user_id: ID!
+  items: [OrderItemInput!]!
+  shipping_address: String
+  billing_address: String
+  payment_method: String
+  notes: String
+}
+
+input UpdateOrderInput {
+  status: String
+  fulfillment_status: String
+  payment_status: String
+  shipping_address: String
+  billing_address: String
+  notes: String
+}
+
+input CreateUserInput {
+  email: String!
+  password: String!
+  firstName: String
+  lastName: String
+  first_name: String
+  last_name: String
+  phone: String
+  role: String!
+  isActive: Boolean
+  is_active: Boolean
+}
+
+input UpdateUserInput {
+  email: String
+  password: String
+  first_name: String
+  last_name: String
+  phone: String
+  role: String
+  is_active: Boolean
+}
+
+type ImageUploadResponse {
+  path: String!
+  url: String!
+  filename: String!
+}
+
+type Notification {
+  id: ID!
+  user_id: ID
+  type: String!
+  title: String!
+  message: String!
+  data: String
+  read_at: DateTime
+  created_at: DateTime
+  updated_at: DateTime
+}
+
+type MarkAllNotificationsAsReadResponse {
+  message: String!
+  count: Int!
+}
+
+

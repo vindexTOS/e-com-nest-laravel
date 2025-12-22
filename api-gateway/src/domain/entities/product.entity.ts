@@ -62,6 +62,7 @@ export class Product extends BaseEntity {
   @Column({ type: 'varchar', length: 255, nullable: true })
   image: string | null;
 
+
   @ManyToOne(() => Category, (category) => category.products, { nullable: true })
   @JoinColumn({ name: 'category_id' })
   category: Category | null;
