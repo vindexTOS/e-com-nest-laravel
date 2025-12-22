@@ -96,27 +96,48 @@ export class ProductsService implements OnModuleInit {
   async syncToElasticsearch(): Promise<{ message: string; productsCount: number }> {
     this.logger.log('Starting full sync to Elasticsearch...');
 
-    if (!this.productRepository) {
-      throw new Error('ProductRepository not available for sync');
-    }
-
-    const products = await this.productRepository.find({
-      relations: ['category'],
-      withDeleted: false,
-    });
+    const products = await this.readDataSource.query(
+      `SELECT * FROM products WHERE deleted_at IS NULL ORDER BY updated_at DESC`
+    );
 
     this.logger.log(`Found ${products.length} products in read database, syncing to Elasticsearch...`);
 
+    let synced = 0;
     for (const product of products) {
-      await this.elasticsearchService.indexProduct(product);
+      try {
+        const productData = {
+          id: product.id,
+          name: product.name,
+          slug: product.slug,
+          description: product.description,
+          sku: product.sku,
+          price: product.price,
+          compare_at_price: product.compare_at_price,
+          cost_price: product.cost_price,
+          stock: product.stock,
+          low_stock_threshold: product.low_stock_threshold,
+          weight: product.weight,
+          status: product.status,
+          is_featured: product.is_featured,
+          meta_title: product.meta_title,
+          meta_description: product.meta_description,
+          category_id: product.category_id,
+          image: product.image,
+          created_at: product.created_at,
+          updated_at: product.updated_at,
+        };
+        await this.elasticsearchService.indexProduct(productData);
+        synced++;
+      } catch (error: any) {
+        this.logger.error(`Failed to sync product ${product.id} to Elasticsearch: ${error.message}`);
+      }
     }
 
-    this.logger.log(`Synced ${products.length} products to Elasticsearch.`);
-    await this.invalidateProductCache();
+    this.logger.log(`Synced ${synced}/${products.length} products to Elasticsearch`);
 
     return {
-      message: 'Sync completed successfully',
-      productsCount: products.length,
+      message: `Synced ${synced} products to Elasticsearch.`,
+      productsCount: synced,
     };
   }
 
@@ -239,54 +260,27 @@ export class ProductsService implements OnModuleInit {
       return this.getDeletedProducts({ search, categoryId, page, limit });
     }
 
-    const v = await this.getProductsCacheVersion();
-    const cacheKey = `products:v${v}:list:${search || 'all'}:${categoryId || 'all'}:${status || 'all'}:${page}:${limit}`;
+    await this.syncToElasticsearch();
 
-    const cached = await this.redisService.get<SearchResult<any>>(cacheKey);
-    if (cached) {
-      this.logger.debug(`Cache hit for products list: ${cacheKey}`);
-      return cached;
-    }
-
-    const result = await this.elasticsearchService.searchProductsWithFilters({
-      search,
-      categoryId,
-      status: status || 'active',
-      page,
-      limit,
+    const [dbProducts, dbTotal] = await this.productRepository.findAndCount({
+      where: {
+        ...(status ? { status: status as any } : {}),
+        ...(categoryId ? { categoryId } : {}),
+      },
+      relations: ['category'],
+      take: limit,
+      skip: (page - 1) * limit,
+      order: { updatedAt: 'DESC' },
     });
 
-    let data = result.hits;
-    let total = typeof result.total === 'object' ? result.total.value : result.total;
-
-    if (total === 0 && !search) {
-      this.logger.log('Elasticsearch returned 0 products. Falling back to Database...');
-      const [dbProducts, dbTotal] = await this.productRepository.findAndCount({
-        where: {
-          ...(status ? { status: status as any } : {}),
-          ...(categoryId ? { categoryId } : {}),
-        },
-        relations: ['category'],
-        take: limit,
-        skip: (page - 1) * limit,
-        order: { updatedAt: 'DESC' },
-      });
-      
-      data = dbProducts;
-      total = dbTotal;
-
-      this.syncToElasticsearch().catch(err => this.logger.error('Background sync failed', err));
-    }
-
     const searchResult: SearchResult<any> = {
-      data,
-      total,
+      data: dbProducts,
+      total: dbTotal,
       page,
       limit,
-      totalPages: Math.ceil(total / limit),
+      totalPages: Math.ceil(dbTotal / limit),
     };
 
-    await this.redisService.set(cacheKey, searchResult, this.CACHE_TTL);
     return searchResult;
   }
 

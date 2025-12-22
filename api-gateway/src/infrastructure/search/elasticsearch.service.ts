@@ -57,14 +57,15 @@ export class ElasticsearchService implements OnModuleInit {
           stock: product.stock ?? null,
           lowStockThreshold: product.lowStockThreshold ?? product.low_stock_threshold ?? null,
           status: product.status,
-          categoryId: product.categoryId,
-          categoryName: product.category?.name,
+          categoryId: product.categoryId ?? product.category_id ?? null,
+          categoryName: product.category?.name ?? null,
           image: product.image || null,
-          updatedAt: product.updatedAt || new Date().toISOString(),
+          updatedAt: product.updatedAt ?? product.updated_at ?? new Date().toISOString(),
         },
       });
-    } catch (error) {
-      this.logger.error('Error indexing product:', error);
+    } catch (error: any) {
+      this.logger.error(`Error indexing product ${product.id}:`, error);
+      throw error;
     }
   }
 

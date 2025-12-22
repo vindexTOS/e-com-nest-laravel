@@ -108,10 +108,6 @@ export class DatabaseEventSubscriber implements OnModuleInit, OnModuleDestroy {
 
         await queryRunner.commitTransaction();
         this.logger.log(`Successfully processed ${event.operation} on ${event.table} (${event.id})`);
-        
-        if (event.table === 'products') {
-          await this.handleProductSync(event);
-        }
       } catch (error: any) {
         await queryRunner.rollbackTransaction();
         this.logger.error(`Failed to process ${event.operation} on ${event.table} (${event.id}): ${error.message}`, error.stack);
@@ -311,57 +307,5 @@ export class DatabaseEventSubscriber implements OnModuleInit, OnModuleDestroy {
     }
   }
 
-  private async handleProductSync(event: DatabaseEvent): Promise<void> {
-    try {
-      if (event.operation === 'DELETE') {
-        await this.elasticsearchService.deleteProduct(event.id);
-        this.logger.log(`Deleted product ${event.id} from Elasticsearch`);
-      } else {
-        const productData = {
-          id: event.data.id,
-          name: event.data.name,
-          slug: event.data.slug,
-          description: event.data.description,
-          sku: event.data.sku,
-          price: event.data.price,
-          compare_at_price: event.data.compare_at_price,
-          cost_price: event.data.cost_price,
-          stock: event.data.stock,
-          low_stock_threshold: event.data.low_stock_threshold,
-          weight: event.data.weight,
-          status: event.data.status,
-          is_featured: event.data.is_featured,
-          meta_title: event.data.meta_title,
-          meta_description: event.data.meta_description,
-          category_id: event.data.category_id,
-          image: event.data.image,
-          created_at: event.data.created_at,
-          updated_at: event.data.updated_at,
-        };
-        
-        await this.elasticsearchService.indexProduct(productData);
-        this.logger.log(`Synced product ${event.id} to Elasticsearch`);
-      }
-      
-      await this.invalidateProductCache();
-    } catch (error: any) {
-      this.logger.error(`Failed to sync product to Elasticsearch: ${error.message}`, error.stack);
-    }
-  }
-
-  private async invalidateProductCache(): Promise<void> {
-    try {
-      const next = Date.now().toString();
-      const cacheClient = new Redis({
-        host: this.configService.get<string>('REDIS_HOST', 'redis'),
-        port: this.configService.get<number>('REDIS_PORT', 6379),
-      });
-      await cacheClient.setex(this.PRODUCTS_CACHE_VERSION_KEY, this.PRODUCTS_CACHE_VERSION_TTL, next);
-      await cacheClient.quit();
-      this.logger.debug('Product cache invalidated');
-    } catch (error: any) {
-      this.logger.error(`Failed to invalidate product cache: ${error.message}`);
-    }
-  }
 }
 
