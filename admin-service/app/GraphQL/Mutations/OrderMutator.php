@@ -117,22 +117,6 @@ class OrderMutator
             $order->status = 'processing';
             $order->save();
 
-            // Create notification for admins
-            $notification = Notification::create([
-                'user_id' => null, // null = for all admins
-                'type' => 'order_created',
-                'title' => 'New Order Received',
-                'message' => "Order {$orderNumber} placed by {$user->first_name} {$user->last_name} for \${$total}",
-                'data' => [
-                    'order_id' => $order->id,
-                    'order_number' => $orderNumber,
-                    'user_name' => "{$user->first_name} {$user->last_name}",
-                    'user_email' => $user->email,
-                    'total' => $total,
-                    'items_count' => count($items),
-                ],
-            ]);
-
             DB::commit();
 
             $freshOrder = $order->fresh(['user', 'items.product']);
@@ -149,7 +133,21 @@ class OrderMutator
                 $this->publishDatabaseEvent('order_items', 'INSERT', $item);
             }
 
-            broadcast(new NewOrderNotification($notification->toArray()))->toOthers();
+            $notification = Notification::create([
+                'user_id' => null,
+                'type' => 'order_created',
+                'title' => 'New Order Received',
+                'message' => "Order {$orderNumber} placed by {$user->first_name} {$user->last_name} for \${$total}",
+                'data' => [
+                    'order_id' => $order->id,
+                    'order_number' => $orderNumber,
+                    'user_name' => "{$user->first_name} {$user->last_name}",
+                    'user_email' => $user->email,
+                    'total' => $total,
+                    'items_count' => count($items),
+                ],
+            ]);
+
             $this->publishDatabaseEvent('notifications', 'INSERT', $notification);
 
             return $order->fresh(['user', 'items.product']);

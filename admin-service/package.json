@@ -25,10 +25,11 @@
         "antd": "^6.1.1",
         "dayjs": "^1.11.13",
         "jspdf": "^3.0.4",
+        "laravel-echo": "^2.2.6",
+        "pusher-js": "^8.4.0-rc2",
         "react": "^19.2.3",
         "react-dom": "^19.2.3",
         "react-router-dom": "^7.11.0",
-        "socket.io-client": "^4.7.5",
-        "pusher-js": "^8.4.0-rc2"
+        "socket.io-client": "^4.7.5"
     }
 }

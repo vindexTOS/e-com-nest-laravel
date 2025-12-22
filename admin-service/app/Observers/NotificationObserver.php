@@ -2,6 +2,7 @@
 
 namespace App\Observers;
 
+use App\Events\NewOrderNotification;
 use App\Models\Notification;
 use Illuminate\Support\Facades\Log;
 
@@ -11,6 +12,10 @@ class NotificationObserver
     public function created(Notification $notification): void
     {
         $this->publishEvent('notifications', 'INSERT', $notification);
+        
+        if ($notification->user_id === null) {
+            event(new NewOrderNotification($notification->toArray()));
+        }
     }
 
     public function updated(Notification $notification): void

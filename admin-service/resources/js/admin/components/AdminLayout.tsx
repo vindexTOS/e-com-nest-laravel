@@ -4,8 +4,13 @@ import { LogoutOutlined, AppstoreOutlined, ShoppingOutlined, FolderOutlined, Sho
 import { useAuth } from '../../shared/hooks/useAuth';
 import { useNavigate, Link, useLocation } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import Pusher from 'pusher-js';
 import { nestjsNotificationsApi, Notification } from '../../api';
+
+declare global {
+    interface Window {
+        Echo: any;
+    }
+}
 
 const { Header, Content, Sider } = Layout;
 const { Title, Text } = Typography;
@@ -20,7 +25,7 @@ const AdminLayout: React.FC<AdminLayoutProps> = ({ children }) => {
     const location = useLocation();
     const queryClient = useQueryClient();
     const [dropdownOpen, setDropdownOpen] = useState(false);
-    const pusherRef = useRef<Pusher | null>(null);
+    const echoChannelRef = useRef<any>(null);
 
     const handleLogout = () => {
         logout();
@@ -72,33 +77,32 @@ const AdminLayout: React.FC<AdminLayoutProps> = ({ children }) => {
         },
     });
 
-    // Connect to Pusher/Soketi for real-time notifications
     useEffect(() => {
-        if (!token) return;
+        if (!token || !window.Echo) {
+            console.log('Echo not available or no token');
+            return;
+        }
 
-        // Set up Pusher connection to Soketi
-        const pusher = new Pusher('ecom-key', {
-            wsHost: window.location.hostname,
-            wsPort: 6001,
-            wssPort: 6001,
-            forceTLS: false,
-            disableStats: true,
-            enabledTransports: ['ws', 'wss'],
-            cluster: 'mt1',
-        });
-
-        pusherRef.current = pusher;
-
-        // Subscribe to admin notifications channel
-        const channel = pusher.subscribe('admin-notifications');
+        const echo = window.Echo;
         
-        channel.bind('new-notification', (data: Notification) => {
-            console.log('New notification received via Pusher:', data);
+        console.log('Setting up Laravel Echo listener for admin-notifications');
+        
+        const channel = echo.channel('admin-notifications');
+        echoChannelRef.current = channel;
+        
+        channel
+            .subscribed(() => {
+                console.log('Successfully subscribed to admin-notifications channel');
+            })
+            .error((error: any) => {
+                console.error('Error subscribing to admin-notifications channel:', error);
+            });
+        
+        const handleNotification = (data: Notification) => {
+            console.log('New notification received via Laravel Echo:', data);
             
-            // Invalidate query to refetch notifications from server
             queryClient.invalidateQueries({ queryKey: ['notifications'] });
             
-            // Show toast notification
             message.info({
                 content: (
                     <div>
@@ -109,21 +113,36 @@ const AdminLayout: React.FC<AdminLayoutProps> = ({ children }) => {
                 duration: 5,
                 icon: <BellOutlined style={{ color: '#1890ff' }} />,
             });
+        };
+
+        channel.listen('new-notification', handleNotification);
+        
+        channel.listen('.new-notification', handleNotification);
+        
+        channel.listen('App\\Events\\NewOrderNotification', handleNotification);
+
+        const pusher = echo.connector.pusher;
+        pusher.connection.bind('connected', () => {
+            console.log('Pusher/Echo connected successfully');
         });
 
-        pusher.connection.bind('connected', () => {
-            console.log('Connected to Soketi WebSocket for real-time notifications');
+        pusher.connection.bind('disconnected', () => {
+            console.log('Pusher/Echo disconnected');
         });
 
         pusher.connection.bind('error', (err: any) => {
-            console.error('Pusher connection error:', err);
+            console.error('Pusher/Echo connection error:', err);
         });
 
         return () => {
-            channel.unbind_all();
-            pusher.unsubscribe('admin-notifications');
-            pusher.disconnect();
-            pusherRef.current = null;
+            console.log('Cleaning up Echo listener');
+            if (channel) {
+                channel.stopListening('new-notification');
+                channel.stopListening('.new-notification');
+                channel.stopListening('App\\Events\\NewOrderNotification');
+                echo.leave('admin-notifications');
+            }
+            echoChannelRef.current = null;
         };
     }, [token, queryClient]);
 

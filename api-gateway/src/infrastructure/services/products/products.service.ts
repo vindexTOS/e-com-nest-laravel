@@ -20,7 +20,7 @@ export class ProductsService implements OnModuleInit {
   private readonly logger = new Logger(ProductsService.name);
   private readonly CACHE_TTL = 3600;
   private readonly PRODUCTS_CACHE_VERSION_KEY = 'products:cache:version';
-  private readonly PRODUCTS_CACHE_VERSION_TTL = 60 * 60 * 24 * 365 * 10; // 10 years
+  private readonly PRODUCTS_CACHE_VERSION_TTL = 60 * 60 * 24 * 365 * 10; 
 
   constructor(
     private readonly elasticsearchService: ElasticsearchService,
