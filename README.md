@@ -2,7 +2,44 @@
 
 Hybrid e-commerce platform with Nest.js API Gateway and Laravel Admin Panel. Built with Clean Architecture principles, featuring JWT authentication, role-based access control, and shared authentication between services.
 
-## 🚀 Quick Start Setup
+## Table of Contents
+
+- [Architecture Overview](#architecture-overview)
+- [Quick Start Setup](#quick-start-setup)
+- [NestJS Clean Architecture](#nestjs-clean-architecture-overview)
+- [Database Replication](#database-replication-setup)
+- [Nginx Reverse Proxy](#nginx-reverse-proxy)
+- [Accessing the Application](#accessing-the-application)
+- [API Documentation](#api-documentation)
+- [Authentication Flow](#authentication-flow)
+- [Error Handling](#error-handling)
+- [Development](#development)
+
+---
+
+## Architecture Overview
+
+This application implements all the requirements from the assignment, but I've added my own architectural decisions to make it more scalable and maintainable.
+
+The core idea is to separate read and write operations using CQRS (Command Query Responsibility Segregation). I've set up two PostgreSQL database instances - one for writes and one for reads. The write database handles all mutations (creates, updates, deletes) while the read database is optimized for queries. This approach makes sense for e-commerce applications since they typically have way more reads than writes.
+
+For the NestJS side, I went with Clean Architecture, separating the codebase into three distinct layers: domain (business logic), application (controllers), and infrastructure (services, database, cache). This makes the codebase much easier to test and maintain.
+
+On the Laravel side, I chose GraphQL for all endpoints because the assignment specifically asked for it. NestJS also has a GraphQL endpoint, so you can use either REST or GraphQL depending on your preference.
+
+The system uses an event-driven architecture, especially for the ordering flow. When an order is created, we emit several events - one for sending emails, another for payment processing, and so on. I didn't use webhooks because I thought they were redundant since we already have Redis handling inter-service communication.
+
+Speaking of Redis, I'm using it to sync data between the read and write databases. When something changes in the write database, we publish a Redis event that triggers a sync to the read database. This keeps both databases in sync without adding unnecessary complexity.
+
+For real-time updates, we use two different approaches. On the user side, we use Socket.IO - when a user is created or updated, it emits an event that pushes the updated information to all connected clients. On the admin dashboard, we use Laravel Echo with Soketi (a Pusher-compatible server) for live notification updates. This is also part of the ordering event flow - when an order is created, admins get instant notifications.
+
+To handle product searches and caching, we've integrated Elasticsearch and Redis. Products are indexed in Elasticsearch for fast full-text search, and we use Redis to cache frequently accessed data, reducing the load on the database.
+
+The whole system is containerized with Docker Compose, making it easy to spin up all services with a single command. All services communicate through a shared network, and Nginx acts as a reverse proxy to route requests to the appropriate service.
+
+---
+
+## Quick Start Setup
 
 ### Step 1: Clone and Start
 
@@ -42,18 +79,6 @@ This will run all NestJS service unit tests.
 
 ---
 
-## 📑 Quick Navigation
-
-| Section | Description |
-|---------|-------------|
-| [NestJS Architecture](#nestjs-clean-architecture-overview) | Clean architecture structure and layer responsibilities |
-| [Quick Start](#quick-start) | Setup and running instructions |
-| [API Documentation](#api-documentation) | Complete API endpoints for Nest.js and Laravel |
-| [Authentication Flow](#authentication-flow) | JWT token sharing and usage |
-| [Error Handling](#error-handling) | Global error handling and validation |
-| [Validation](#validation) | DTO validation rules |
-| [Authentication & Authorization](#authentication--authorization) | Guards, roles, and token management |
-| [Development](#development) | Local development setup |
 
 ## Architecture
 
@@ -67,7 +92,7 @@ This will run all NestJS service unit tests.
 
 The Nest.js API Gateway follows **Clean Architecture** principles with three main layers:
 
-### 📁 Project Structure
+### Project Structure
 
 ```
 api-gateway/src/
@@ -76,7 +101,7 @@ api-gateway/src/
 └── infrastructure/      # Services, auth, cache, database, helpers
 ```
 
-### 🎯 Layer Responsibilities
+### Layer Responsibilities
 
 **1. Domain Layer** (`domain/`)
 - **Entities**: Database models (User, Product, Order) with business rules
@@ -94,13 +119,13 @@ api-gateway/src/
 - **Persistence**: TypeORM configuration, migrations, seeders
 - **Libs**: Guards, decorators, filters, Swagger decorators
 
-### 🔄 Data Flow
+### Data Flow
 
 ```
 HTTP Request → Controllers → Services → Database/Redis
 ```
 
-### ✅ Benefits
+### Benefits
 
 - **Separation of Concerns**: Each layer has one responsibility
 - **Testability**: Easy to mock and test in isolation
