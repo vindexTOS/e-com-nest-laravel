@@ -106,6 +106,9 @@ jobs:
     if: github.event_name == 'push' && (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master')
     
     steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      
       - name: Deploy to server via SSH
         if: secrets.DEPLOY_HOST != '' && secrets.DEPLOY_USER != '' && secrets.DEPLOY_SSH_KEY != ''
         uses: appleboy/ssh-action@v1.0.3
@@ -117,7 +120,6 @@ jobs:
           script: |
             cd ${{ secrets.DEPLOY_PATH || '/var/www/e-com-nest-laravel' }}
             
-            # Configure git to use GitHub token if provided
             if [ -n "${{ secrets.GITHUB_TOKEN }}" ]; then
               echo "🔑 Configuring git with GitHub token..."
               git remote set-url origin https://${{ secrets.GITHUB_TOKEN }}@github.com/${{ github.repository }}.git || true
@@ -129,32 +131,26 @@ jobs:
             echo "📥 Pulling latest changes..."
             git reset --hard origin/main || git reset --hard origin/master
             
-            # Make deployment script executable and run it
             if [ -f "cicd/deploy.sh" ]; then
               chmod +x cicd/deploy.sh
               SKIP_GIT_PULL=true bash cicd/deploy.sh
             else
-              # Fallback to inline deployment if script doesn't exist
               echo "⚠️  cicd/deploy.sh not found, using inline deployment..."
-              echo "🐳 Stopping existing containers..."
               docker-compose down || true
-              
-              echo "🔨 Rebuilding Docker images..."
               docker-compose build --no-cache
-              
-              echo "▶️  Starting containers..."
               docker-compose up -d
-              
-              echo "⏳ Waiting for services to be ready..."
               sleep 15
-              
-              echo "🗄️  Running migrations..."
               docker-compose exec -T api-gateway npm run migration:run || true
               docker-compose exec -T admin-service php artisan migrate --force || true
-              
-              echo "📊 Container status:"
               docker-compose ps
             fi
             
             echo "✅ Deployment completed successfully!"
+      
+      - name: Deployment status
+        if: secrets.DEPLOY_HOST == '' || secrets.DEPLOY_USER == '' || secrets.DEPLOY_SSH_KEY == ''
+        run: |
+          echo "ℹ️  Deployment skipped - SSH secrets not configured"
+          echo "✅ Tests passed successfully"
+          echo "✅ Deployment ready (configure secrets to enable auto-deploy)"
 
