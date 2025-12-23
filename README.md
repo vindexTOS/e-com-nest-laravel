@@ -2,6 +2,46 @@
 
 Hybrid e-commerce platform with Nest.js API Gateway and Laravel Admin Panel. Built with Clean Architecture principles, featuring JWT authentication, role-based access control, and shared authentication between services.
 
+## 🚀 Quick Start Setup
+
+### Step 1: Clone and Start
+
+```bash
+git clone <repository-url>
+cd e-com-nest-laravel
+docker compose up -d --build
+```
+
+Wait for all services to start (this may take a few minutes on first run).
+
+### Step 2: Access the Application
+
+#### Admin Dashboard
+- **URL**: http://localhost/admin
+- **Email**: `admin@gmail.com`
+- **Password**: `1234567`
+
+#### User/Customer Dashboard
+- **URL**: http://localhost
+- **Email**: `user@gmail.com`
+- **Password**: `1234567`
+
+### Step 3: Seed Products (Optional)
+
+1. Log in to the admin dashboard at http://localhost/admin
+2. Navigate to the **Products** page
+3. Click the **"Seed Products"** button to generate sample products
+
+### Step 4: Run Tests
+
+```bash
+./cicd/test.sh
+```
+
+This will run all NestJS service unit tests.
+
+---
+
 ## 📑 Quick Navigation
 
 | Section | Description |
