@@ -1,4 +1,5 @@
 import { Module } from '@nestjs/common';
+import { HttpModule } from '@nestjs/axios';
 import { ProductController } from './product/product.controller';
 import { OrderController } from './order/order.controller';
 import { UserController } from './user/user.controller';
@@ -17,6 +18,7 @@ import { AuthModule } from '../../infrastructure/authentication/auth.module';
 
 @Module({
   imports: [
+    HttpModule,
     UsersModule,
     ProductsModule,
     CategoriesModule,
