@@ -20,6 +20,7 @@ describe('ProductsService', () => {
     searchProductsWithFilters: jest.fn(),
     getProductById: jest.fn(),
     indexProduct: jest.fn(),
+    syncToElasticsearch: jest.fn(),
   };
 
   const mockRedisService = {
@@ -28,10 +29,21 @@ describe('ProductsService', () => {
     publish: jest.fn().mockResolvedValue(1),
   };
 
+  const mockQueryBuilder = {
+    leftJoinAndSelect: jest.fn().mockReturnThis(),
+    andWhere: jest.fn().mockReturnThis(),
+    orderBy: jest.fn().mockReturnThis(),
+    skip: jest.fn().mockReturnThis(),
+    take: jest.fn().mockReturnThis(),
+    getCount: jest.fn(),
+    getMany: jest.fn(),
+  };
+
   const mockProductRepository = {
     find: jest.fn(),
     findOne: jest.fn(),
     findAndCount: jest.fn(),
+    createQueryBuilder: jest.fn(() => mockQueryBuilder),
   };
 
   const mockReadDataSource = {
@@ -85,7 +97,9 @@ describe('ProductsService', () => {
 
       mockReadDataSource.query.mockResolvedValue([]);
       mockElasticsearchService.indexProduct.mockResolvedValue(undefined);
-      mockProductRepository.findAndCount.mockResolvedValue([mockProducts, 2]);
+      mockElasticsearchService.searchProductsWithFilters.mockResolvedValue({ hits: [], total: 0 });
+      mockQueryBuilder.getCount.mockResolvedValue(2);
+      mockQueryBuilder.getMany.mockResolvedValue(mockProducts);
 
       const result = await service.getProducts({
         page: 1,
@@ -94,24 +108,28 @@ describe('ProductsService', () => {
 
       expect(result.data).toEqual(mockProducts);
       expect(result.total).toBe(2);
-      expect(mockReadDataSource.query).toHaveBeenCalled();
     });
 
     it('should sync products to ElasticsearchService during getProducts', async () => {
       const mockProducts = [{ id: '1', name: 'Product 1', price: 100 }];
+      const dbProduct = { id: '1', name: 'Product 1', updated_at: new Date(), deleted_at: null };
 
-      const dbProducts = [
-        { id: '1', name: 'Product 1', updated_at: new Date() },
-      ];
-
-      mockReadDataSource.query.mockResolvedValue(dbProducts);
+      mockReadDataSource.query
+        .mockResolvedValueOnce([dbProduct])
+        .mockResolvedValueOnce([]);
+      mockElasticsearchService.searchProductsWithFilters
+        .mockResolvedValueOnce({ hits: [], total: 0 })
+        .mockResolvedValueOnce({
+          hits: [{ id: '1', ...mockProducts[0] }],
+          total: 1,
+        });
       mockElasticsearchService.indexProduct.mockResolvedValue(undefined);
-      mockProductRepository.findAndCount.mockResolvedValue([mockProducts, 1]);
+      mockProductRepository.find.mockResolvedValue(mockProducts);
 
-      await service.getProducts({ page: 1, limit: 10 });
+      await service.getProducts({ page: 1, limit: 10, search: 'Product' });
 
-      expect(mockReadDataSource.query).toHaveBeenCalled();
       expect(mockElasticsearchService.indexProduct).toHaveBeenCalled();
+      expect(mockElasticsearchService.searchProductsWithFilters).toHaveBeenCalled();
     });
   });
 
@@ -133,13 +151,54 @@ describe('ProductsService', () => {
   describe('syncToElasticsearch', () => {
     it('should sync products to ElasticsearchService', async () => {
       const mockProducts = [
-        { id: '1', name: 'Product 1', category: null },
-        { id: '2', name: 'Product 2', category: null },
+        {
+          id: '1',
+          name: 'Product 1',
+          slug: 'product-1',
+          description: 'Description 1',
+          sku: 'SKU1',
+          price: '100',
+          compare_at_price: null,
+          cost_price: null,
+          stock: 10,
+          low_stock_threshold: 5,
+          weight: null,
+          status: 'active',
+          is_featured: false,
+          meta_title: null,
+          meta_description: null,
+          category_id: null,
+          image: null,
+          created_at: new Date(),
+          updated_at: new Date(),
+          deleted_at: null,
+        },
+        {
+          id: '2',
+          name: 'Product 2',
+          slug: 'product-2',
+          description: 'Description 2',
+          sku: 'SKU2',
+          price: '200',
+          compare_at_price: null,
+          cost_price: null,
+          stock: 20,
+          low_stock_threshold: 5,
+          weight: null,
+          status: 'active',
+          is_featured: false,
+          meta_title: null,
+          meta_description: null,
+          category_id: null,
+          image: null,
+          created_at: new Date(),
+          updated_at: new Date(),
+          deleted_at: null,
+        },
       ];
 
-      mockReadDataSource.query.mockResolvedValue(mockProducts);
-      mockElasticsearchService.indexProduct.mockResolvedValue(undefined);
-      mockRedisService.set.mockResolvedValue(undefined);
+      mockReadDataSource.query = jest.fn().mockResolvedValue(mockProducts);
+      mockElasticsearchService.indexProduct = jest.fn().mockResolvedValue(undefined);
 
       const result = await service.syncToElasticsearch();
 

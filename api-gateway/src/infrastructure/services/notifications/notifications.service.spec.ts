@@ -5,7 +5,8 @@ import { ConfigService } from '@nestjs/config';
 import { NotFoundException } from '@nestjs/common';
 import { NotificationsService } from './notifications.service';
 import { Notification } from '../../../domain/entities/notification.entity';
-import { of } from 'rxjs';
+import { RedisService } from '../../cache/redis.service';
+import { of, firstValueFrom } from 'rxjs';
 
 describe('NotificationsService', () => {
   let service: NotificationsService;
@@ -24,6 +25,7 @@ describe('NotificationsService', () => {
     createQueryBuilder: jest.fn(() => mockQueryBuilder),
     findOne: jest.fn(),
     count: jest.fn(),
+    save: jest.fn(),
   };
 
   const mockHttpService = {
@@ -31,7 +33,15 @@ describe('NotificationsService', () => {
   };
 
   const mockConfigService = {
-    get: jest.fn(() => 'http://admin-service:8000/graphql'),
+    get: jest.fn((key: string) => {
+      if (key === 'LARAVEL_WEBHOOK_URL') return 'http://admin-service:8000/api/webhook';
+      if (key === 'TEST_WEB_HOOK_KEY') return 'test-key';
+      return 'http://admin-service:8000/graphql';
+    }),
+  };
+
+  const mockRedisService = {
+    publish: jest.fn().mockResolvedValue(1),
   };
 
   beforeEach(async () => {
@@ -49,6 +59,10 @@ describe('NotificationsService', () => {
         {
           provide: ConfigService,
           useValue: mockConfigService,
+        },
+        {
+          provide: RedisService,
+          useValue: mockRedisService,
         },
       ],
     }).compile();
@@ -97,15 +111,19 @@ describe('NotificationsService', () => {
       mockHttpService.post.mockReturnValue(
         of({
           data: {
-            data: {
-              markNotificationAsRead: {
-                id: '1',
-                read_at: new Date().toISOString(),
-              },
+            success: true,
+            notification: {
+              id: '1',
+              read_at: new Date().toISOString(),
             },
           },
         }),
       );
+      
+      mockNotificationRepository.save.mockResolvedValue({
+        ...mockNotification,
+        readAt: new Date(),
+      });
 
       const result = await service.markAsRead('1');
 
@@ -114,6 +132,7 @@ describe('NotificationsService', () => {
     });
 
     it('should throw NotFoundException if notification not found', async () => {
+      mockNotificationRepository.findOne.mockReset();
       mockNotificationRepository.findOne.mockResolvedValue(null);
 
       await expect(service.markAsRead('invalid')).rejects.toThrow(
