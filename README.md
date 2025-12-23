@@ -40,8 +40,13 @@ The whole system is containerized with Docker Compose, making it easy to spin up
 git clone https://github.com/vindexTOS/e-com-nest-laravel.git
 cd e-com-nest-laravel
 docker compose up -d --build
-```
 
+```
+#### for legacy docker
+```
+docker-compose up -d --build
+
+```
 ```
 It takes few seconds for nestjs API gateway to load, in this time nginx might return 502 gateway error 
 ```
