@@ -1,7 +1,5 @@
 # E-Commerce Platform
 
-Hybrid e-commerce platform with Nest.js API Gateway and Laravel Admin Panel. Built with Clean Architecture principles, featuring JWT authentication, role-based access control, and shared authentication between services.
-
 ## Table of Contents
 
 - [Architecture Overview](#architecture-overview)
