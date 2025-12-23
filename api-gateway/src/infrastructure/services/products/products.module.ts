@@ -9,6 +9,7 @@ import { Product } from '../../../domain/entities/product.entity';
 @Module({
   imports: [
     TypeOrmModule.forFeature([Product], 'read'),
+    TypeOrmModule.forFeature([Product], 'write'),
     DatabaseModule,
     RedisModule,
     ElasticsearchModule,

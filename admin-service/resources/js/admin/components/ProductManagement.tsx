@@ -65,36 +65,80 @@ const ProductManagement: React.FC<ProductManagementProps> = ({ onClose }) => {
     };
 
     const saveProduct = useMutation({
-        mutationFn: ({ id, values }: { id?: string; values: any }) => {
+        mutationFn: async ({ id, values }: { id?: string; values: any }) => {
             const imageFile = values.image?.file?.originFileObj || values.image?.file;
+            
+            // Handle image: if it's a file, upload to Laravel first (keep Laravel for image upload)
+            // Otherwise use existing image path
+            let imagePath: string | undefined = undefined;
+            if (imageFile && imageFile instanceof File) {
+                // Upload image via Laravel GraphQL ImageMutator
+                try {
+                    const { graphQLRequest } = await import('../../graphql/client');
+                    const uploadMutation = `
+                        mutation UploadProductImage($file: Upload!) {
+                            uploadProductImage(file: $file) {
+                                path
+                                url
+                                filename
+                            }
+                        }
+                    `;
+                    const uploadData = await graphQLRequest<{ uploadProductImage: { path: string; url: string; filename: string } }>(uploadMutation, { file: imageFile });
+                    imagePath = uploadData.uploadProductImage?.path;
+                    
+                    if (!imagePath) {
+                        message.warning('Image uploaded but path not returned');
+                    }
+                } catch (err: any) {
+                    const errorMsg = err?.message || 'Image upload failed';
+                    console.error('Image upload failed:', errorMsg);
+                    message.error(`Image upload failed: ${errorMsg}`);
+                    // Continue without image - user can add it later
+                }
+            } else if (typeof values.image === 'string') {
+                // Existing image path
+                imagePath = values.image;
+            }
+            
+            // Map to NestJS API format (camelCase)
             const input = {
                 name: values.name,
                 description: values.description,
                 sku: values.sku,
                 price: Number(values.price),
-                compare_at_price: values.compare_at_price ? Number(values.compare_at_price) : undefined,
-                cost_price: values.cost_price ? Number(values.cost_price) : undefined,
+                compareAtPrice: values.compare_at_price ? Number(values.compare_at_price) : undefined,
+                costPrice: values.cost_price ? Number(values.cost_price) : undefined,
                 stock: values.stock !== undefined && values.stock !== null ? Number(values.stock) : undefined,
-                low_stock_threshold: values.low_stock_threshold !== undefined && values.low_stock_threshold !== null ? Number(values.low_stock_threshold) : undefined,
+                lowStockThreshold: values.low_stock_threshold !== undefined && values.low_stock_threshold !== null ? Number(values.low_stock_threshold) : undefined,
                 weight: values.weight !== undefined && values.weight !== null ? Number(values.weight) : undefined,
                 status: values.status,
-                is_featured: values.is_featured ?? false,
-                meta_title: values.meta_title,
-                meta_description: values.meta_description,
-                category_id: values.category_id || undefined,
-                image: imageFile || null,
+                isFeatured: values.is_featured ?? false,
+                metaTitle: values.meta_title,
+                metaDescription: values.meta_description,
+                categoryId: values.category_id || undefined,
+                image: imagePath,
             };
-            if (id) return productsGql.update(id, input);
-            return productsGql.create(input);
+            
+            if (id) {
+                return nestjsProductsApi.update(id, input);
+            } else {
+                return nestjsProductsApi.create(input);
+            }
         },
         onSuccess: async (_res, vars) => {
             message.success(vars.id ? 'Product updated successfully' : 'Product created successfully');
             setModalVisible(false);
             setEditingProduct(null);
             form.resetFields();
+            // Wait a bit for sync to complete
+            await new Promise(resolve => setTimeout(resolve, 500));
             await queryClient.refetchQueries({ queryKey: ['products'] });
         },
-        onError: (error: any) => message.error(error.response?.data?.message || 'Operation failed'),
+        onError: (error: any) => {
+            const errorMsg = error.response?.data?.message || error.message || 'Operation failed';
+            message.error(errorMsg);
+        },
     });
 
     const deleteProduct = useMutation({

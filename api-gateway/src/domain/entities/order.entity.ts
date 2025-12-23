@@ -58,14 +58,14 @@ export class Order extends BaseEntity {
   @Column({ length: 3, default: 'USD' })
   currency: string;
 
-  @Column({ name: 'shipping_address', nullable: true })
-  shippingAddress: string;
+  @Column({ name: 'shipping_address', type: 'text', nullable: true })
+  shippingAddress: string | null;
 
-  @Column({ name: 'billing_address', nullable: true })
-  billingAddress: string;
+  @Column({ name: 'billing_address', type: 'text', nullable: true })
+  billingAddress: string | null;
 
-  @Column({ name: 'payment_method', nullable: true })
-  paymentMethod: string;
+  @Column({ name: 'payment_method', type: 'text', nullable: true })
+  paymentMethod: string | null;
 
   @Column({ name: 'payment_status', default: 'pending' })
   paymentStatus: string;
@@ -80,7 +80,7 @@ export class Order extends BaseEntity {
   deliveredAt: Date | null;
 
   @Column({ type: 'text', nullable: true })
-  notes: string;
+  notes: string | null;
 
   @ManyToOne(() => User, (user) => user.orders)
   @JoinColumn({ name: 'user_id' })

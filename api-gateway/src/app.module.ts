@@ -22,6 +22,8 @@ import { ProductsModule } from './infrastructure/services/products/products.modu
 import { CategoriesModule } from './infrastructure/services/categories/categories.module';
 import { OrdersModule } from './infrastructure/services/orders/orders.module';
 import { NotificationsModule } from './infrastructure/services/notifications/notifications.module';
+import { EmailModule } from './infrastructure/services/email/email.module';
+import { EventsModule } from './infrastructure/events/events.module';
 import { UsersGateway } from './infrastructure/websockets/users.gateway';
 
 @Module({
@@ -41,6 +43,8 @@ import { UsersGateway } from './infrastructure/websockets/users.gateway';
     CategoriesModule,
     OrdersModule,
     NotificationsModule,
+    EmailModule,
+    EventsModule,
   ],
   controllers: [ProductController, OrderController, UserController, StorageController, NotificationController],
   providers: [

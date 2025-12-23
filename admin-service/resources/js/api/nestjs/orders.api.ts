@@ -49,6 +49,20 @@ export const nestjsOrdersApi = {
             .catch(() => ({ data: { data: [], total: 0 } } as any));
     },
     getById: (id: string) => nestjsClient.get<Order>(`/orders/${id}`),
+    create: async (input: {
+        userId?: string;
+        items: Array<{
+            productId: string;
+            quantity: number;
+        }>;
+        shippingAddress?: string;
+        billingAddress?: string;
+        paymentMethod?: string;
+        notes?: string;
+    }): Promise<Order> => {
+        const response = await nestjsClient.post<Order>('/orders', input);
+        return response.data;
+    },
 };
 
 

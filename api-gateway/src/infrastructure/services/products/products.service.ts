@@ -27,6 +27,8 @@ export class ProductsService implements OnModuleInit {
     private readonly redisService: RedisService,
     @InjectRepository(Product, 'read')
     private readonly productRepository: Repository<Product>,
+    @InjectRepository(Product, 'write')
+    private readonly writeProductRepository: Repository<Product>,
     @InjectDataSource('read')
     private readonly readDataSource: DataSource,
     @InjectDataSource('write')
@@ -415,7 +417,8 @@ export class ProductsService implements OnModuleInit {
     // Generate slug if not provided
     const slug = createProductDto.slug || this.generateSlug(createProductDto.name);
 
-    const product = this.productRepository.create({
+    // Write to WRITE database
+    const product = this.writeProductRepository.create({
       ...createProductDto,
       slug,
       stock: createProductDto.stock ?? 0,
@@ -424,17 +427,31 @@ export class ProductsService implements OnModuleInit {
       isFeatured: createProductDto.isFeatured ?? false,
     });
 
-    const saved = await this.productRepository.save(product);
+    const saved = await this.writeProductRepository.save(product);
+
+    // Reload with relations to ensure we have fresh data
+    const freshProduct = await this.writeProductRepository.findOne({
+      where: { id: saved.id },
+      relations: ['category'],
+    });
+
+    if (!freshProduct) {
+      throw new NotFoundException(`Product not found after creation`);
+    }
+
+    // Publish event to Redis for sync (NestJS to NestJS)
+    await this.publishProductEvent('INSERT', freshProduct);
 
     // Sync to Elasticsearch
-    await this.syncProductToElasticsearch(saved);
+    await this.syncProductToElasticsearch(freshProduct);
     await this.invalidateProductCache();
 
-    return saved;
+    return freshProduct;
   }
 
   async updateProduct(id: string, updateProductDto: UpdateProductDto): Promise<Product> {
-    const product = await this.productRepository.findOne({
+    // Check in write database
+    const product = await this.writeProductRepository.findOne({
       where: { id },
       relations: ['category'],
     });
@@ -449,13 +466,78 @@ export class ProductsService implements OnModuleInit {
     }
 
     Object.assign(product, updateProductDto);
-    const saved = await this.productRepository.save(product);
+    // Write to WRITE database
+    const saved = await this.writeProductRepository.save(product);
+
+    // Reload with relations to ensure we have fresh data
+    const freshProduct = await this.writeProductRepository.findOne({
+      where: { id: saved.id },
+      relations: ['category'],
+    });
+
+    if (!freshProduct) {
+      throw new NotFoundException(`Product with ID ${id} not found after save`);
+    }
+
+    // Publish event to Redis for sync (NestJS to NestJS)
+    await this.publishProductEvent('UPDATE', freshProduct);
 
     // Sync to Elasticsearch
-    await this.syncProductToElasticsearch(saved);
+    await this.syncProductToElasticsearch(freshProduct);
     await this.invalidateProductCache();
 
-    return saved;
+    return freshProduct;
+  }
+
+  private async publishProductEvent(operation: 'INSERT' | 'UPDATE' | 'DELETE', product: Product | { id: string }): Promise<void> {
+    try {
+      const serializedData = product instanceof Product ? this.serializeProduct(product) : product;
+      const eventData = {
+        table: 'products',
+        operation,
+        data: serializedData,
+        id: product instanceof Product ? product.id : product.id,
+        timestamp: new Date().toISOString(),
+      };
+
+      const message = JSON.stringify(eventData);
+      const subscribers = await this.redisService.publish('database:events', message);
+      
+      this.logger.log(`Published product event: ${operation} for product ${eventData.id} (subscribers: ${subscribers})`);
+      this.logger.debug(`Event data: ${message.substring(0, 200)}...`);
+      
+      if (subscribers === 0) {
+        this.logger.warn(`No subscribers for product event ${operation} on product ${eventData.id}`);
+      }
+    } catch (error: any) {
+      this.logger.error(`Failed to publish product event: ${error.message}`, error.stack);
+      throw error;
+    }
+  }
+
+  private serializeProduct(product: Product): any {
+    // Convert to snake_case to match database column names
+    return {
+      id: product.id,
+      name: product.name,
+      slug: product.slug,
+      description: product.description,
+      sku: product.sku,
+      price: product.price,
+      compare_at_price: product.compareAtPrice,
+      cost_price: product.costPrice,
+      stock: product.stock,
+      low_stock_threshold: product.lowStockThreshold,
+      weight: product.weight,
+      status: product.status,
+      is_featured: product.isFeatured,
+      meta_title: product.metaTitle,
+      meta_description: product.metaDescription,
+      category_id: product.categoryId,
+      image: product.image,
+      created_at: product.createdAt,
+      updated_at: product.updatedAt,
+    };
   }
 
   private generateSlug(name: string): string {

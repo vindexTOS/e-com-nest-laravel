@@ -1,12 +1,18 @@
 import {
   Controller,
   Get,
+  Post,
   Param,
   Query,
+  Body,
   UseGuards,
 } from '@nestjs/common';
 import { OrdersService } from '../../../infrastructure/services/orders/orders.service';
+import type { CreateOrderDto } from '../../../infrastructure/services/orders/orders.service';
 import { JwtAuthGuard } from '../../../infrastructure/libs/guards/jwt-auth.guard';
+import { RolesGuard } from '../../../infrastructure/libs/guards/roles.guard';
+import { Roles } from '../../../infrastructure/libs/decorators/roles.decorator';
+import { UserRole } from '../../../domain/entities/user.entity';
 import { CurrentUser } from '../../../infrastructure/libs/decorators/current-user.decorator';
 import type { CurrentUserPayload } from '../../../infrastructure/libs/decorators/current-user.decorator';
 import { ApiController } from '../../../infrastructure/libs/swagger/api-docs.decorator';
@@ -70,6 +76,25 @@ export class OrderController {
   @ApiResponse({ status: 404, description: 'Order not found' })
   async findOne(@Param('id') id: string) {
     return this.ordersService.findOne(id);
+  }
+
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(UserRole.CUSTOMER, UserRole.ADMIN)
+  @Post()
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'Create a new order' })
+  @ApiResponse({ status: 201, description: 'Order created successfully' })
+  @ApiResponse({ status: 400, description: 'Invalid input data or insufficient stock' })
+  @ApiResponse({ status: 401, description: 'Unauthorized' })
+  async create(
+    @Body() createOrderDto: CreateOrderDto,
+    @CurrentUser() user: CurrentUserPayload,
+  ) {
+    // If customer, use their user ID (admins can specify userId)
+    if (user.role === UserRole.CUSTOMER) {
+      createOrderDto.userId = user.id;
+    }
+    return this.ordersService.createOrder(createOrderDto);
   }
 
 }

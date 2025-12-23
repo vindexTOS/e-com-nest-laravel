@@ -51,6 +51,17 @@ services:
       # JWT
       - JWT_SECRET=${JWT_SECRET}
       - JWT_EXPIRATION=${JWT_EXPIRATION:-7d}
+      # Email
+      - EMAIL_USER=${EMAIL_USER:-g.kutateli@gmail.com}
+      - EMAIL_PASS=${EMAIL_PASS:-pkal cqkl xodw rhti}
+      # Pusher/Soketi
+      - PUSHER_APP_ID=${PUSHER_APP_ID:-ecom-app}
+      - PUSHER_APP_KEY=${PUSHER_APP_KEY:-ecom-key}
+      - PUSHER_APP_SECRET=${PUSHER_APP_SECRET:-ecom-secret}
+      - PUSHER_HOST=${PUSHER_HOST:-soketi}
+      - PUSHER_PORT=${PUSHER_PORT:-6001}
+      - PUSHER_SCHEME=${PUSHER_SCHEME:-http}
+      - PUSHER_APP_CLUSTER=${PUSHER_APP_CLUSTER:-mt1}
     depends_on:
       postgres-write:
         condition: service_healthy

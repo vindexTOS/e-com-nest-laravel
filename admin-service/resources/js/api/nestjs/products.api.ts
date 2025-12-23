@@ -18,6 +18,25 @@ export interface ProductFilters {
     trashed?: string;
 }
 
+export interface CreateProductInput {
+    name: string;
+    description?: string;
+    sku: string;
+    price: number;
+    compareAtPrice?: number;
+    costPrice?: number;
+    stock?: number;
+    lowStockThreshold?: number;
+    weight?: number;
+    status?: 'draft' | 'active' | 'archived';
+    isFeatured?: boolean;
+    metaTitle?: string;
+    metaDescription?: string;
+    categoryId?: string;
+    slug?: string;
+    image?: string;
+}
+
 export const nestjsProductsApi = {
     getAll: (filters?: ProductFilters) => {
         const params = new URLSearchParams();
@@ -32,6 +51,16 @@ export const nestjsProductsApi = {
     },
 
     getById: (id: string) => nestjsClient.get<any>(`/products/${id}`),
+
+    create: async (input: CreateProductInput): Promise<any> => {
+        const response = await nestjsClient.post('/products', input);
+        return response.data;
+    },
+
+    update: async (id: string, input: Partial<CreateProductInput>): Promise<any> => {
+        const response = await nestjsClient.put(`/products/${id}`, input);
+        return response.data;
+    },
 };
 
 

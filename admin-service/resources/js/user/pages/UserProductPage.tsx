@@ -4,7 +4,7 @@ import { ShoppingOutlined, UserOutlined, LoginOutlined, SearchOutlined, WalletOu
 import { useAuth } from '../../shared/hooks/useAuth';
 import { useNavigate, Link } from 'react-router-dom';
 import axios from 'axios';
-import { ordersGql, categoriesGql, balanceGql } from '../../graphql';
+import { categoriesGql, balanceGql } from '../../graphql';
 import { nestjsOrdersApi } from '../../api';
 import { getImageUrl } from '../../shared/utils/imageUtils';
 
@@ -127,9 +127,8 @@ const UserProductsPage: React.FC = () => {
         }
         
         try {
-            await ordersGql.create({
-                user_id: user.id,
-                items: [{ product_id: productId, quantity: 1 }],
+            await nestjsOrdersApi.create({
+                items: [{ productId: productId, quantity: 1 }],
             });
             message.success('Order placed successfully!');
             loadOrders();

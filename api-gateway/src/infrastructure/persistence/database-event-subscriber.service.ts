@@ -64,7 +64,7 @@ export class DatabaseEventSubscriber implements OnModuleInit, OnModuleDestroy {
 
     this.subscriber.on('message', async (channel, message) => {
       if (channel === this.EVENT_CHANNEL) {
-        this.logger.debug(`Received raw message on ${this.EVENT_CHANNEL}: ${message.substring(0, 100)}`);
+        this.logger.log(`Received message on ${this.EVENT_CHANNEL}: ${message.substring(0, 100)}...`);
         await this.handleEvent(message);
       }
     });
