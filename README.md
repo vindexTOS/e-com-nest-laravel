@@ -255,6 +255,7 @@ The admin user is automatically created on first startup.
 - **Laravel Admin Service (Direct)**: `http://localhost:8000`
 - **GraphQL Endpoint**: `http://localhost/graphql`
 - **Socket.IO Endpoint**: `http://localhost/socket.io`
+- **Laravel Echo / Soketi (WebSocket)**: `http://localhost/app/` (Pusher-compatible)
 
 ### Authentication
 
@@ -1512,7 +1513,7 @@ mutation {
 **How it works**: 
 - Writes to **write database** (PostgreSQL)
 - Publishes Redis event to sync to **read database**
-- Triggers event emitter for Socket.IO to push updated user list to connected clients
+- Triggers event emitter for Laravel Echo to push updated user list to connected clients
 
 ---
 
@@ -1536,7 +1537,7 @@ mutation {
 **How it works**: 
 - Updates **write database** (PostgreSQL)
 - Publishes Redis event to sync to **read database**
-- Triggers event emitter for Socket.IO to push updated user list to connected clients
+- Triggers event emitter for Laravel Echo to push updated user list to connected clients
 
 ---
 
@@ -1765,97 +1766,70 @@ socket.on('orders:updated', (order) => {
 
 ---
 
+## Laravel Echo / Real-time Events (Notifications)
+
+### Connection
+
+**Full URL**: `http://localhost/app/`
+
+**Broadcaster**: Pusher-compatible (Soketi)
+
+**Authentication**: Not required for public channels
+
+**Example (JavaScript):**
+```javascript
+import Echo from 'laravel-echo';
+import Pusher from 'pusher-js';
+
+window.Pusher = Pusher;
+
+window.Echo = new Echo({
+    broadcaster: 'pusher',
+    key: 'ecom-key',
+    wsHost: window.location.hostname || 'localhost',
+    wsPort: 6001,
+    wssPort: 6001,
+    forceTLS: false,
+    disableStats: true,
+    enabledTransports: ['ws', 'wss'],
+    cluster: 'mt1',
+});
+```
+
+---
+
+### Events
+
 #### Notifications Events
-
-##### Get Notifications List
-
-**Emit:**
-```javascript
-socket.emit('notifications:get', {
-  page: 1,
-  limit: 50,
-  unreadOnly: false
-});
-```
-
-**Listen:**
-```javascript
-socket.on('notifications:list', (data) => {
-  console.log(data);
-  // { success: true, data: [...], total: 50, unreadCount: 10 }
-});
-```
-
----
-
-##### Get Unread Count
-
-**Emit:**
-```javascript
-socket.emit('notifications:getUnreadCount');
-```
-
-**Listen:**
-```javascript
-socket.on('notifications:unreadCount', (data) => {
-  console.log(data);
-  // { success: true, unreadCount: 10 }
-});
-```
-
----
-
-##### Mark Notification as Read
-
-**Emit:**
-```javascript
-socket.emit('notifications:markRead', {
-  id: 'uuid'
-});
-```
-
-**Listen:**
-```javascript
-socket.on('notifications:markedRead', (data) => {
-  console.log(data);
-  // { success: true, id: 'uuid', unreadCount: 9 }
-});
-```
-
----
-
-##### Mark All Notifications as Read
-
-**Emit:**
-```javascript
-socket.emit('notifications:markAllRead');
-```
-
-**Listen:**
-```javascript
-socket.on('notifications:allMarkedRead', (data) => {
-  console.log(data);
-  // { success: true, message: '...', count: 10, unreadCount: 0 }
-});
-```
-
----
 
 ##### New Notification (Broadcast)
 
 **Listen:**
 ```javascript
-socket.on('notifications:new', (notification) => {
-  console.log('New notification:', notification);
+const channel = window.Echo.channel('admin-notifications');
+
+channel.listen('new-notification', (notification) => {
+    console.log('New notification:', notification);
+    // {
+    //   id: "uuid",
+    //   user_id: null,
+    //   type: "order_created",
+    //   title: "New Order Received",
+    //   message: "Order ORD-123 placed by John Doe",
+    //   read_at: null,
+    //   created_at: "2024-12-23T10:00:00Z"
+    // }
 });
 ```
 
-**Note**: Automatically broadcasted when a new admin notification is created (e.g., new order).
-
 **How it works**: 
 - When an order is created, it creates an admin notification
-- Notification is broadcasted via **Soketi** (Pusher-compatible) to `admin-notifications` channel
-- Also broadcasted via Socket.IO `notifications:new` event to all connected clients
+- Notification is broadcasted via **Soketi** (Pusher-compatible) to `admin-notifications` channel with event `new-notification`
+- Frontend uses Laravel Echo to listen to this channel for real-time updates
+- This is the **primary method** for receiving notifications in the admin dashboard
+
+**Channel**: `admin-notifications`  
+**Event**: `new-notification`
 
 ---
 
