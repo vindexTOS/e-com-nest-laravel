@@ -9,8 +9,8 @@ import {
   Put,
   Body,
   UseGuards,
+  Inject,
 } from '@nestjs/common';
-import { Inject } from '@nestjs/common';
 import { IProductsService } from '../../../domain/interfaces/services';
 import { Public } from '../../../infrastructure/libs/decorators/public.decorator';
 import { ApiController } from '../../../infrastructure/libs/swagger/api-docs.decorator';
@@ -30,7 +30,10 @@ import { UserRole } from '../../../domain/entities/user.entity';
 @ApiController('Products')
 @Controller('products')
 export class ProductController {
-  constructor(private productsService: ProductsService) {}
+  constructor(
+    @Inject('IProductsService')
+    private productsService: IProductsService,
+  ) {}
 
   @Public()
   @Get()
