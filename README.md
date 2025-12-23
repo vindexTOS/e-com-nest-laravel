@@ -248,17 +248,40 @@ The admin user is automatically created on first startup.
 
 ## API Documentation
 
-### Nest.js API Gateway
+### Base URLs
 
-Base URL: `http://localhost:3000/api`
+- **Nginx Proxy (Recommended)**: `http://localhost`
+- **NestJS API Gateway (Direct)**: `http://localhost:3000`
+- **Laravel Admin Service (Direct)**: `http://localhost:8000`
+- **GraphQL Endpoint**: `http://localhost/graphql`
+- **Socket.IO Endpoint**: `http://localhost/socket.io`
 
-#### Authentication Endpoints
+### Authentication
 
-##### Register Customer
+All protected endpoints require a JWT token in the `Authorization` header:
 
-**POST** `/api/auth/register`
+```
+Authorization: Bearer <your-access-token>
+```
 
-Register a new customer account.
+**How to get a token:**
+1. Register: `POST http://localhost/api/gateway/auth/register`
+2. Login: `POST http://localhost/api/gateway/auth/login`
+3. Use the `accessToken` from the response
+
+---
+
+## REST API Endpoints
+
+### Authentication Endpoints
+
+#### Register Customer
+
+**Full URL**: `http://localhost/api/gateway/auth/register`
+
+**Method**: `POST`
+
+**Authentication**: Not required (Public)
 
 **Request Body:**
 ```json
@@ -276,7 +299,7 @@ Register a new customer account.
 - `password`: Minimum 6 characters (required)
 - `firstName`: 2-50 characters (required)
 - `lastName`: 2-50 characters (required)
-- `phone`: Valid phone format, optional
+- `phone`: Valid phone format (optional)
 
 **Response (201):**
 ```json
@@ -299,11 +322,13 @@ Register a new customer account.
 
 ---
 
-##### Login (Customer or Admin)
+#### Login
 
-**POST** `/api/auth/login`
+**Full URL**: `http://localhost/api/gateway/auth/login`
 
-Login with email and password. Works for both customers and admins.
+**Method**: `POST`
+
+**Authentication**: Not required (Public)
 
 **Request Body:**
 ```json
@@ -312,10 +337,6 @@ Login with email and password. Works for both customers and admins.
   "password": "password123"
 }
 ```
-
-**Validation Rules:**
-- `email`: Valid email address (required)
-- `password`: Minimum 6 characters (required)
 
 **Response (200):**
 ```json
@@ -337,15 +358,15 @@ Login with email and password. Works for both customers and admins.
 - `401`: Invalid credentials
 - `403`: Account is inactive
 
-**Note**: The same token works for both Nest.js API and Laravel Admin Panel.
-
 ---
 
-##### Refresh Token
+#### Refresh Token
 
-**POST** `/api/auth/refresh`
+**Full URL**: `http://localhost/api/gateway/auth/refresh`
 
-Refresh the access token using a refresh token.
+**Method**: `POST`
+
+**Authentication**: Not required (Public)
 
 **Request Body:**
 ```json
@@ -364,106 +385,13 @@ Refresh the access token using a refresh token.
 
 ---
 
-##### Logout
+#### Logout
 
-**POST** `/api/auth/logout`
+**Full URL**: `http://localhost/api/gateway/auth/logout`
 
-Logout and invalidate the current token.
+**Method**: `POST`
 
-**Headers:**
-```
-Authorization: Bearer <access_token>
-```
-
-**Response (200):**
-```json
-{
-  "message": "Logged out successfully"
-}
-```
-
----
-
-### Laravel Admin Panel API
-
-Base URL: `http://localhost:8000/api`
-
-#### Admin Authentication Endpoints
-
-##### Admin Login
-
-**POST** `/api/admin/login`
-
-Login to the admin panel. Only users with `role = 'admin'` can access.
-
-**Request Body:**
-```json
-{
-  "email": "admin@gmail.com",
-  "password": "1234567"
-}
-```
-
-**Validation Rules:**
-- `email`: Valid email address (required)
-- `password`: Minimum 6 characters (required)
-
-**Response (200):**
-```json
-{
-  "accessToken": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...",
-  "refreshToken": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...",
-  "user": {
-    "id": "uuid",
-    "email": "admin@gmail.com",
-    "firstName": "Admin",
-    "lastName": "User",
-    "role": "admin"
-  }
-}
-```
-
-**Error Responses:**
-- `400`: Validation error
-- `401`: Invalid credentials
-- `403`: Account is inactive or user is not an admin
-
-**Note**: This token can also be used with Nest.js API endpoints. Both services share the same JWT secret.
-
----
-
-##### Refresh Token
-
-**POST** `/api/admin/refresh`
-
-Refresh the access token using a refresh token.
-
-**Request Body:**
-```json
-{
-  "refreshToken": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
-}
-```
-
-**Response (200):**
-```json
-{
-  "accessToken": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...",
-  "refreshToken": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
-}
-```
-
-**Error Responses:**
-- `400`: Validation error
-- `401`: Invalid or revoked refresh token
-
----
-
-##### Admin Logout
-
-**POST** `/api/admin/logout`
-
-Logout from admin panel and invalidate tokens.
+**Authentication**: Required (Bearer token)
 
 **Headers:**
 ```
@@ -484,16 +412,1556 @@ Authorization: Bearer <access_token>
 }
 ```
 
-**Error Responses:**
-- `401`: Unauthorized
+---
+
+### Product Endpoints
+
+#### Get All Products
+
+**Full URL**: `http://localhost/api/gateway/products`
+
+**Method**: `GET`
+
+**Authentication**: Not required (Public)
+
+**Query Parameters:**
+- `page` (number, default: 1): Page number
+- `limit` (number, default: 10): Items per page
+- `search` (string, optional): Search term
+- `categoryId` (string, optional): Filter by category
+- `status` (string, optional): Filter by status (active, draft, archived)
+- `trashed` (string, optional): Set to `"true"` to include deleted products
+
+**Example:**
+```
+GET http://localhost/api/gateway/products?page=1&limit=20&search=laptop&status=active
+```
+
+**Response (200):**
+```json
+{
+  "data": [
+    {
+      "id": "uuid",
+      "name": "Product Name",
+      "slug": "product-name",
+      "description": "Product description",
+      "sku": "SKU-001",
+      "price": 99.99,
+      "stock": 50,
+      "status": "active",
+      "category": { "id": "uuid", "name": "Category" }
+    }
+  ],
+  "total": 100,
+  "page": 1,
+  "limit": 20,
+  "totalPages": 5
+}
+```
+
+**Note**: Uses **Elasticsearch** for search and **Redis** for caching. Products are cached for 1 hour.
 
 ---
 
-##### Get Current Admin User
+#### Get Product by ID
 
-**GET** `/api/admin/user`
+**Full URL**: `http://localhost/api/gateway/products/:id`
 
-Get the currently authenticated admin user.
+**Method**: `GET`
+
+**Authentication**: Not required (Public)
+
+**Example:**
+```
+GET http://localhost/api/gateway/products/123e4567-e89b-12d3-a456-426614174000
+```
+
+**Response (200):**
+```json
+{
+  "id": "uuid",
+  "name": "Product Name",
+  "slug": "product-name",
+  "description": "Product description",
+  "sku": "SKU-001",
+  "price": 99.99,
+  "stock": 50,
+  "status": "active",
+  "category": { "id": "uuid", "name": "Category" }
+}
+```
+
+**Note**: Uses **Elasticsearch** for product lookup and **Redis** for caching.
+
+---
+
+#### Create Product
+
+**Full URL**: `http://localhost/api/gateway/products`
+
+**Method**: `POST`
+
+**Authentication**: Required (Admin only)
+
+**Headers:**
+```
+Authorization: Bearer <access_token>
+```
+
+**Request Body:**
+```json
+{
+  "name": "Wireless Mouse",
+  "slug": "wireless-mouse",
+  "description": "Ergonomic wireless mouse",
+  "sku": "MOUSE-001",
+  "price": 29.99,
+  "compareAtPrice": 39.99,
+  "costPrice": 15.00,
+  "stock": 100,
+  "lowStockThreshold": 10,
+  "weight": 0.2,
+  "status": "active",
+  "categoryId": "uuid",
+  "isFeatured": true,
+  "image": "products/mouse.jpg"
+}
+```
+
+**Response (201):**
+```json
+{
+  "id": "uuid",
+  "name": "Wireless Mouse",
+  "slug": "wireless-mouse",
+  "price": 29.99,
+  "stock": 100,
+  "status": "active"
+}
+```
+
+**How it works**: 
+- Writes to **write database** (PostgreSQL)
+- Publishes Redis event to sync to **read database**
+- Syncs to **Elasticsearch** for search
+- Invalidates **Redis cache**
+
+**Error Responses:**
+- `400`: Validation error
+- `401`: Unauthorized
+- `403`: Admin access required
+
+---
+
+#### Update Product
+
+**Full URL**: `http://localhost/api/gateway/products/:id`
+
+**Method**: `PUT`
+
+**Authentication**: Required (Admin only)
+
+**Headers:**
+```
+Authorization: Bearer <access_token>
+```
+
+**Request Body:**
+```json
+{
+  "name": "Updated Product Name",
+  "price": 39.99,
+  "stock": 75
+}
+```
+
+**Response (200):**
+```json
+{
+  "id": "uuid",
+  "name": "Updated Product Name",
+  "price": 39.99,
+  "stock": 75
+}
+```
+
+**How it works**: 
+- Updates **write database** (PostgreSQL)
+- Publishes Redis event to sync to **read database**
+- Syncs to **Elasticsearch** for search
+- Invalidates **Redis cache**
+
+**Error Responses:**
+- `400`: Validation error
+- `401`: Unauthorized
+- `403`: Admin access required
+- `404`: Product not found
+
+---
+
+#### Sync Products to Elasticsearch
+
+**Full URL**: `http://localhost/api/gateway/products/sync`
+
+**Method**: `POST`
+
+**Authentication**: Not required (Public)
+
+**Response (200):**
+```json
+{
+  "message": "Products synced successfully",
+  "productsCount": 150
+}
+```
+
+**Note**: Manually syncs all products from read database to **Elasticsearch**.
+
+---
+
+#### Sync Products from Write Database
+
+**Full URL**: `http://localhost/api/gateway/products/sync-from-write`
+
+**Method**: `POST`
+
+**Authentication**: Not required (Public)
+
+**Response (200):**
+```json
+{
+  "message": "Products synced successfully",
+  "synced": 150
+}
+```
+
+**Note**: Syncs products from **write database** to **read database** and **Elasticsearch**.
+
+---
+
+### Category Endpoints
+
+#### Get All Categories
+
+**Full URL**: `http://localhost/api/gateway/categories`
+
+**Method**: `GET`
+
+**Authentication**: Not required (Public)
+
+**Query Parameters:**
+- `page` (number, default: 1): Page number
+- `limit` (number, default: 10): Items per page
+- `search` (string, optional): Search term
+- `parentId` (string, optional): Filter by parent category
+- `isActive` (boolean, optional): Filter by active status
+
+**Example:**
+```
+GET http://localhost/api/gateway/categories?page=1&limit=20&search=electronics
+```
+
+**Response (200):**
+```json
+{
+  "data": [
+    {
+      "id": "uuid",
+      "name": "Electronics",
+      "slug": "electronics",
+      "description": "Electronic products",
+      "isActive": true,
+      "parent": null,
+      "children": []
+    }
+  ],
+  "total": 50,
+  "page": 1,
+  "limit": 20,
+  "totalPages": 3
+}
+```
+
+---
+
+#### Get Category by ID
+
+**Full URL**: `http://localhost/api/gateway/categories/:id`
+
+**Method**: `GET`
+
+**Authentication**: Not required (Public)
+
+**Response (200):**
+```json
+{
+  "id": "uuid",
+  "name": "Electronics",
+  "slug": "electronics",
+  "description": "Electronic products",
+  "isActive": true,
+  "parent": null,
+  "children": []
+}
+```
+
+---
+
+### Order Endpoints
+
+#### Get All Orders
+
+**Full URL**: `http://localhost/api/gateway/orders`
+
+**Method**: `GET`
+
+**Authentication**: Required
+
+**Headers:**
+```
+Authorization: Bearer <access_token>
+```
+
+**Query Parameters:**
+- `user_id` (string, optional): Filter by user ID
+- `status` (string, optional): Filter by status (pending, processing, completed, cancelled)
+- `fulfillment_status` (string, optional): Filter by fulfillment status
+- `order_number` (string, optional): Search by order number
+- `limit` (number, optional): Items per page
+- `offset` (number, optional): Pagination offset
+
+**Example:**
+```
+GET http://localhost/api/gateway/orders?status=pending&limit=20&offset=0
+```
+
+**Response (200):**
+```json
+{
+  "data": [
+    {
+      "id": "uuid",
+      "orderNumber": "ORD-1234567890-1234",
+      "status": "pending",
+      "total": 199.99,
+      "user": { "id": "uuid", "email": "user@example.com" },
+      "items": [
+        {
+          "id": "uuid",
+          "productId": "uuid",
+          "quantity": 2,
+          "price": 99.99,
+          "product": { "name": "Product Name" }
+        }
+      ]
+    }
+  ],
+  "total": 50
+}
+```
+
+---
+
+#### Get My Orders
+
+**Full URL**: `http://localhost/api/gateway/orders/my-orders`
+
+**Method**: `GET`
+
+**Authentication**: Required
+
+**Headers:**
+```
+Authorization: Bearer <access_token>
+```
+
+**Query Parameters:**
+- `status` (string, optional): Filter by status
+- `fulfillment_status` (string, optional): Filter by fulfillment status
+- `limit` (number, optional): Items per page
+- `offset` (number, optional): Pagination offset
+
+**Response (200):**
+```json
+{
+  "data": [
+    {
+      "id": "uuid",
+      "orderNumber": "ORD-1234567890-1234",
+      "status": "pending",
+      "total": 199.99,
+      "items": []
+    }
+  ],
+  "total": 10
+}
+```
+
+---
+
+#### Get Order by ID
+
+**Full URL**: `http://localhost/api/gateway/orders/:id`
+
+**Method**: `GET`
+
+**Authentication**: Required
+
+**Headers:**
+```
+Authorization: Bearer <access_token>
+```
+
+**Response (200):**
+```json
+{
+  "id": "uuid",
+  "orderNumber": "ORD-1234567890-1234",
+  "status": "pending",
+  "total": 199.99,
+  "user": { "id": "uuid", "email": "user@example.com" },
+  "items": []
+}
+```
+
+---
+
+#### Create Order
+
+**Full URL**: `http://localhost/api/gateway/orders`
+
+**Method**: `POST`
+
+**Authentication**: Required (Customer or Admin)
+
+**Headers:**
+```
+Authorization: Bearer <access_token>
+```
+
+**Request Body:**
+```json
+{
+  "userId": "uuid",
+  "items": [
+    {
+      "productId": "uuid",
+      "quantity": 2
+    }
+  ],
+  "shippingAddress": "123 Main St, City, State 12345",
+  "billingAddress": "123 Main St, City, State 12345",
+  "paymentMethod": "wallet_balance",
+  "notes": "Please deliver during business hours"
+}
+```
+
+**Response (201):**
+```json
+{
+  "id": "uuid",
+  "orderNumber": "ORD-1234567890-1234",
+  "status": "pending",
+  "total": 199.99,
+  "user": { "id": "uuid", "email": "user@example.com" },
+  "items": []
+}
+```
+
+**How it works**: 
+- Writes to **write database** (PostgreSQL)
+- Publishes Redis event to sync to **read database**
+- Creates admin notification
+- Publishes order event for email processing
+- Broadcasts notification via **Soketi** (Pusher-compatible) for live admin notifications
+
+**Error Responses:**
+- `400`: Validation error or insufficient stock
+- `401`: Unauthorized
+- `404`: User or product not found
+
+---
+
+### User Endpoints
+
+#### Get All Users
+
+**Full URL**: `http://localhost/api/gateway/users`
+
+**Method**: `GET`
+
+**Authentication**: Required
+
+**Headers:**
+```
+Authorization: Bearer <access_token>
+```
+
+**Query Parameters:**
+- `limit` (number, optional): Items per page
+- `offset` (number, optional): Pagination offset
+- `search` (string, optional): Search term
+- `role` (string, optional): Filter by role (admin, customer)
+
+**Example:**
+```
+GET http://localhost/api/gateway/users?limit=20&offset=0&search=john
+```
+
+**Response (200):**
+```json
+{
+  "data": [
+    {
+      "id": "uuid",
+      "email": "user@example.com",
+      "firstName": "John",
+      "lastName": "Doe",
+      "role": "customer",
+      "isActive": true
+    }
+  ],
+  "total": 50
+}
+```
+
+---
+
+### Payment Endpoints
+
+#### Add Balance
+
+**Full URL**: `http://localhost/api/gateway/payment/add-balance`
+
+**Method**: `POST`
+
+**Authentication**: Required (Customer or Admin)
+
+**Headers:**
+```
+Authorization: Bearer <access_token>
+```
+
+**Request Body:**
+```json
+{
+  "amount": 100.00,
+  "cardNumber": "4111111111111111",
+  "cardExpiry": "12/25",
+  "cardCvv": "123"
+}
+```
+
+**Validation Rules:**
+- `amount`: Number between 1 and 10000 (required)
+- `cardNumber`: 13-19 digits (required)
+- `cardExpiry`: MM/YY format (required)
+- `cardCvv`: 3-4 digits (required)
+
+**Response (200):**
+```json
+{
+  "balance": 150.00,
+  "message": "Successfully added $100.00 to your balance"
+}
+```
+
+**Error Responses:**
+- `400`: Validation error or invalid card
+- `401`: Unauthorized
+- `404`: User not found
+
+---
+
+#### Get Balance
+
+**Full URL**: `http://localhost/api/gateway/payment/balance`
+
+**Method**: `GET`
+
+**Authentication**: Required (Customer or Admin)
+
+**Headers:**
+```
+Authorization: Bearer <access_token>
+```
+
+**Response (200):**
+```json
+{
+  "balance": 150.00,
+  "message": "Balance retrieved successfully"
+}
+```
+
+---
+
+#### Process Payment
+
+**Full URL**: `http://localhost/api/gateway/payment/process`
+
+**Method**: `POST`
+
+**Authentication**: Required (Customer or Admin)
+
+**Headers:**
+```
+Authorization: Bearer <access_token>
+```
+
+**Request Body:**
+```json
+{
+  "orderId": "uuid",
+  "paymentMethod": "wallet_balance"
+}
+```
+
+**Or for credit card:**
+```json
+{
+  "orderId": "uuid",
+  "paymentMethod": "credit_card",
+  "cardNumber": "4111111111111111",
+  "cardExpiry": "12/25",
+  "cardCvv": "123",
+  "cardholderName": "John Doe"
+}
+```
+
+**Response (200):**
+```json
+{
+  "success": true,
+  "message": "Payment processed successfully",
+  "order": {
+    "id": "uuid",
+    "orderNumber": "ORD-1234567890-1234",
+    "paymentStatus": "paid",
+    "total": 199.99
+  }
+}
+```
+
+**Error Responses:**
+- `400`: Validation error, insufficient balance, or order already paid
+- `401`: Unauthorized
+- `404`: Order or user not found
+
+---
+
+### Notification Endpoints
+
+#### Get All Notifications
+
+**Full URL**: `http://localhost/api/gateway/notifications`
+
+**Method**: `GET`
+
+**Authentication**: Required (Admin only)
+
+**Headers:**
+```
+Authorization: Bearer <access_token>
+```
+
+**Query Parameters:**
+- `limit` (number, default: 50): Items per page
+- `page` (number, default: 1): Page number
+- `unread_only` (string, optional): Set to `"true"` to show only unread
+
+**Example:**
+```
+GET http://localhost/api/gateway/notifications?limit=20&page=1&unread_only=true
+```
+
+**Response (200):**
+```json
+{
+  "data": [
+    {
+      "id": "uuid",
+      "type": "order_created",
+      "title": "New Order Received",
+      "message": "Order ORD-123 placed by John Doe",
+      "readAt": null,
+      "createdAt": "2024-12-23T10:00:00Z"
+    }
+  ],
+  "total": 50,
+  "unreadCount": 10,
+  "page": 1,
+  "limit": 20,
+  "totalPages": 3
+}
+```
+
+---
+
+#### Get Unread Count
+
+**Full URL**: `http://localhost/api/gateway/notifications/unread-count`
+
+**Method**: `GET`
+
+**Authentication**: Required (Admin only)
+
+**Headers:**
+```
+Authorization: Bearer <access_token>
+```
+
+**Response (200):**
+```json
+{
+  "unreadCount": 10
+}
+```
+
+---
+
+#### Mark Notification as Read
+
+**Full URL**: `http://localhost/api/gateway/notifications/:id/read`
+
+**Method**: `POST`
+
+**Authentication**: Required (Admin only)
+
+**Headers:**
+```
+Authorization: Bearer <access_token>
+```
+
+**Response (200):**
+```json
+{
+  "message": "Notification marked as read",
+  "notification": {
+    "id": "uuid",
+    "readAt": "2024-12-23T10:00:00Z"
+  }
+}
+```
+
+---
+
+#### Mark All Notifications as Read
+
+**Full URL**: `http://localhost/api/gateway/notifications/mark-all-read`
+
+**Method**: `POST`
+
+**Authentication**: Required (Admin only)
+
+**Headers:**
+```
+Authorization: Bearer <access_token>
+```
+
+**Response (200):**
+```json
+{
+  "message": "All notifications marked as read",
+  "count": 10
+}
+```
+
+---
+
+### Storage Endpoints
+
+#### Get Image
+
+**Full URL**: `http://localhost/api/gateway/storage/images/:path`
+
+**Method**: `GET`
+
+**Authentication**: Not required (Public)
+
+**Example:**
+```
+GET http://localhost/api/gateway/storage/images/products/mouse.jpg
+```
+
+**Response (200)**: Image file with appropriate content-type
+
+**Note**: Proxies images from Laravel storage service.
+
+---
+
+#### Get Product Image
+
+**Full URL**: `http://localhost/api/gateway/storage/product-image/:path`
+
+**Method**: `GET`
+
+**Authentication**: Not required (Public)
+
+**Example:**
+```
+GET http://localhost/api/gateway/storage/product-image/mouse.jpg
+```
+
+**Response (200)**: Image file with appropriate content-type
+
+---
+
+## GraphQL API
+
+### Endpoint
+
+**Full URL**: `http://localhost/graphql`
+
+**Method**: `POST`
+
+**Authentication**: Required for mutations (Bearer token)
+
+**Headers:**
+```
+Authorization: Bearer <access_token>
+Content-Type: application/json
+```
+
+### Queries
+
+#### Get Current Admin User
+
+```graphql
+query {
+  adminUser {
+    id
+    email
+    firstName
+    lastName
+    role
+    isActive
+  }
+}
+```
+
+---
+
+### Mutations
+
+#### Register
+
+```graphql
+mutation {
+  register(input: {
+    email: "user@example.com"
+    password: "password123"
+    firstName: "John"
+    lastName: "Doe"
+    phone: "+1234567890"
+  }) {
+    accessToken
+    refreshToken
+    user {
+      id
+      email
+      firstName
+      lastName
+      role
+    }
+  }
+}
+```
+
+---
+
+#### Login
+
+```graphql
+mutation {
+  login(input: {
+    email: "user@example.com"
+    password: "password123"
+  }) {
+    accessToken
+    refreshToken
+    user {
+      id
+      email
+      firstName
+      lastName
+      role
+    }
+  }
+}
+```
+
+---
+
+#### Admin Login
+
+```graphql
+mutation {
+  adminLogin(input: {
+    email: "admin@gmail.com"
+    password: "1234567"
+  }) {
+    accessToken
+    refreshToken
+    user {
+      id
+      email
+      firstName
+      lastName
+      role
+    }
+  }
+}
+```
+
+---
+
+#### Create Category
+
+```graphql
+mutation {
+  createCategory(input: {
+    name: "Electronics"
+    slug: "electronics"
+    description: "Electronic products"
+    isActive: true
+  }) {
+    id
+    name
+    slug
+    description
+    isActive
+  }
+}
+```
+
+**How it works**: 
+- Writes to **write database** (PostgreSQL)
+- Automatically syncs to **read database** via PostgreSQL Logical Replication
+
+---
+
+#### Update Category
+
+```graphql
+mutation {
+  updateCategory(id: "uuid", input: {
+    name: "Updated Electronics"
+    isActive: true
+  }) {
+    id
+    name
+    slug
+    isActive
+  }
+}
+```
+
+---
+
+#### Delete Category
+
+```graphql
+mutation {
+  deleteCategory(id: "uuid") {
+    message
+  }
+}
+```
+
+---
+
+#### Restore Category
+
+```graphql
+mutation {
+  restoreCategory(id: "uuid") {
+    message
+  }
+}
+```
+
+---
+
+#### Create Product
+
+```graphql
+mutation {
+  createProduct(input: {
+    name: "Wireless Mouse"
+    sku: "MOUSE-001"
+    price: 29.99
+    stock: 100
+    status: active
+    categoryId: "uuid"
+  }) {
+    id
+    name
+    sku
+    price
+    stock
+    status
+  }
+}
+```
+
+**How it works**: 
+- Writes to **write database** (PostgreSQL)
+- Publishes Redis event to sync to **read database**
+- Syncs to **Elasticsearch** for search
+- Invalidates **Redis cache**
+
+---
+
+#### Update Product
+
+```graphql
+mutation {
+  updateProduct(id: "uuid", input: {
+    name: "Updated Mouse"
+    price: 39.99
+    stock: 75
+  }) {
+    id
+    name
+    price
+    stock
+  }
+}
+```
+
+**How it works**: 
+- Updates **write database** (PostgreSQL)
+- Publishes Redis event to sync to **read database**
+- Syncs to **Elasticsearch** for search
+- Invalidates **Redis cache**
+
+---
+
+#### Delete Product
+
+```graphql
+mutation {
+  deleteProduct(id: "uuid") {
+    message
+  }
+}
+```
+
+---
+
+#### Create Order
+
+```graphql
+mutation {
+  createOrder(input: {
+    userId: "uuid"
+    items: [
+      {
+        productId: "uuid"
+        quantity: 2
+      }
+    ]
+    shippingAddress: "123 Main St"
+    paymentMethod: "wallet_balance"
+  }) {
+    id
+    orderNumber
+    status
+    total
+    items {
+      id
+      productId
+      quantity
+      price
+    }
+  }
+}
+```
+
+**How it works**: 
+- Writes to **write database** (PostgreSQL)
+- Publishes Redis event to sync to **read database**
+- Creates admin notification
+- Publishes order event for email processing
+- Broadcasts notification via **Soketi** (Pusher-compatible) for live admin notifications
+
+---
+
+#### Create User
+
+```graphql
+mutation {
+  createUser(input: {
+    email: "newuser@example.com"
+    password: "password123"
+    firstName: "Jane"
+    lastName: "Doe"
+    role: customer
+  }) {
+    id
+    email
+    firstName
+    lastName
+    role
+  }
+}
+```
+
+**How it works**: 
+- Writes to **write database** (PostgreSQL)
+- Publishes Redis event to sync to **read database**
+- Triggers event emitter for Socket.IO to push updated user list to connected clients
+
+---
+
+#### Update User
+
+```graphql
+mutation {
+  updateUser(id: "uuid", input: {
+    firstName: "Updated Name"
+    isActive: true
+  }) {
+    id
+    email
+    firstName
+    lastName
+    isActive
+  }
+}
+```
+
+**How it works**: 
+- Updates **write database** (PostgreSQL)
+- Publishes Redis event to sync to **read database**
+- Triggers event emitter for Socket.IO to push updated user list to connected clients
+
+---
+
+#### Upload Product Image
+
+```graphql
+mutation {
+  uploadProductImage(file: <Upload>) {
+    path
+    url
+    filename
+  }
+}
+```
+
+**Note**: Uses multipart/form-data for file upload.
+
+---
+
+#### Add Balance
+
+```graphql
+mutation {
+  addBalance(input: {
+    amount: 100.00
+    cardNumber: "4111111111111111"
+    cardExpiry: "12/25"
+    cardCvv: "123"
+  }) {
+    balance
+    message
+  }
+}
+```
+
+---
+
+#### Get My Balance
+
+```graphql
+mutation {
+  getMyBalance {
+    balance
+    message
+  }
+}
+```
+
+---
+
+## Socket.IO / WebSocket API
+
+### Connection
+
+**Full URL**: `http://localhost/socket.io`
+
+**Namespace**: `/ws`
+
+**Path**: `/socket.io`
+
+**Authentication**: Optional (JWT token in query or auth object)
+
+**Example (JavaScript):**
+```javascript
+import io from 'socket.io-client';
+
+const socket = io('http://localhost/socket.io', {
+  path: '/socket.io',
+  transports: ['websocket'],
+  query: {
+    token: 'your-jwt-token' // Optional
+  }
+});
+```
+
+---
+
+### Events
+
+#### Users Events
+
+##### Get Users List
+
+**Emit:**
+```javascript
+socket.emit('users:get', {
+  search: 'john',
+  role: 'customer',
+  page: 1,
+  limit: 50,
+  withDeleted: false
+});
+```
+
+**Listen:**
+```javascript
+socket.on('users:list', (data) => {
+  console.log(data);
+  // { data: [...], total: 50 }
+});
+```
+
+**How it works**: 
+- When a user is created or updated via Laravel GraphQL, it publishes a Redis event
+- UsersGateway subscribes to Redis `database:events` channel
+- On receiving a `users` event (INSERT, UPDATE, DELETE), it waits 300ms for DB sync
+- Fetches the latest user list from read database
+- Broadcasts `users:list` event to all connected clients
+
+---
+
+##### Restore User
+
+**Emit:**
+```javascript
+socket.emit('users:restore', {
+  id: 'uuid'
+});
+```
+
+**Listen:**
+```javascript
+socket.on('users:restored', (data) => {
+  console.log(data);
+  // { success: true, data: {...} }
+});
+```
+
+---
+
+#### Orders Events
+
+##### Get Orders List
+
+**Emit:**
+```javascript
+socket.emit('orders:get', {
+  userId: 'uuid',
+  status: 'pending',
+  page: 1,
+  limit: 50
+});
+```
+
+**Listen:**
+```javascript
+socket.on('orders:list', (data) => {
+  console.log(data);
+  // { success: true, data: [...], total: 50 }
+});
+```
+
+---
+
+##### Get Single Order
+
+**Emit:**
+```javascript
+socket.emit('orders:getOne', {
+  id: 'uuid'
+});
+```
+
+**Listen:**
+```javascript
+socket.on('orders:one', (data) => {
+  console.log(data);
+  // { success: true, data: {...} }
+});
+```
+
+---
+
+##### Get My Orders
+
+**Emit:**
+```javascript
+socket.emit('orders:getMyOrders', {
+  status: 'pending',
+  page: 1,
+  limit: 50
+});
+```
+
+**Listen:**
+```javascript
+socket.on('orders:myList', (data) => {
+  console.log(data);
+  // { success: true, data: [...], total: 10 }
+});
+```
+
+**Note**: Requires authentication (JWT token).
+
+---
+
+##### Restore Order
+
+**Emit:**
+```javascript
+socket.emit('orders:restore', {
+  id: 'uuid'
+});
+```
+
+**Listen:**
+```javascript
+socket.on('orders:restored', (data) => {
+  console.log(data);
+  // { success: true, data: {...} }
+});
+```
+
+---
+
+##### Order Updated (Broadcast)
+
+**Listen:**
+```javascript
+socket.on('orders:updated', (order) => {
+  console.log('Order updated:', order);
+});
+```
+
+**Note**: Automatically broadcasted when an order is updated.
+
+---
+
+#### Notifications Events
+
+##### Get Notifications List
+
+**Emit:**
+```javascript
+socket.emit('notifications:get', {
+  page: 1,
+  limit: 50,
+  unreadOnly: false
+});
+```
+
+**Listen:**
+```javascript
+socket.on('notifications:list', (data) => {
+  console.log(data);
+  // { success: true, data: [...], total: 50, unreadCount: 10 }
+});
+```
+
+---
+
+##### Get Unread Count
+
+**Emit:**
+```javascript
+socket.emit('notifications:getUnreadCount');
+```
+
+**Listen:**
+```javascript
+socket.on('notifications:unreadCount', (data) => {
+  console.log(data);
+  // { success: true, unreadCount: 10 }
+});
+```
+
+---
+
+##### Mark Notification as Read
+
+**Emit:**
+```javascript
+socket.emit('notifications:markRead', {
+  id: 'uuid'
+});
+```
+
+**Listen:**
+```javascript
+socket.on('notifications:markedRead', (data) => {
+  console.log(data);
+  // { success: true, id: 'uuid', unreadCount: 9 }
+});
+```
+
+---
+
+##### Mark All Notifications as Read
+
+**Emit:**
+```javascript
+socket.emit('notifications:markAllRead');
+```
+
+**Listen:**
+```javascript
+socket.on('notifications:allMarkedRead', (data) => {
+  console.log(data);
+  // { success: true, message: '...', count: 10, unreadCount: 0 }
+});
+```
+
+---
+
+##### New Notification (Broadcast)
+
+**Listen:**
+```javascript
+socket.on('notifications:new', (notification) => {
+  console.log('New notification:', notification);
+});
+```
+
+**Note**: Automatically broadcasted when a new admin notification is created (e.g., new order).
+
+**How it works**: 
+- When an order is created, it creates an admin notification
+- Notification is broadcasted via **Soketi** (Pusher-compatible) to `admin-notifications` channel
+- Also broadcasted via Socket.IO `notifications:new` event to all connected clients
+
+---
+
+## Laravel Admin Panel API
+
+### Base URL
+
+**Full URL**: `http://localhost/api/admin-api/`
+
+**Authentication**: Required (Bearer token)
+
+**Headers:**
+```
+Authorization: Bearer <access_token>
+```
+
+### Admin Authentication Endpoints
+
+#### Admin Login
+
+**Full URL**: `http://localhost/api/admin-api/login`
+
+**Method**: `POST`
+
+**Request Body:**
+```json
+{
+  "email": "admin@gmail.com",
+  "password": "1234567"
+}
+```
+
+**Response (200):**
+```json
+{
+  "accessToken": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...",
+  "refreshToken": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...",
+  "user": {
+    "id": "uuid",
+    "email": "admin@gmail.com",
+    "firstName": "Admin",
+    "lastName": "User",
+    "role": "admin"
+  }
+}
+```
+
+**Note**: This token can also be used with Nest.js API endpoints. Both services share the same JWT secret.
+
+---
+
+#### Refresh Token
+
+**Full URL**: `http://localhost/api/admin-api/refresh`
+
+**Method**: `POST`
+
+**Request Body:**
+```json
+{
+  "refreshToken": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
+}
+```
+
+**Response (200):**
+```json
+{
+  "accessToken": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...",
+  "refreshToken": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
+}
+```
+
+---
+
+#### Admin Logout
+
+**Full URL**: `http://localhost/api/admin-api/logout`
+
+**Method**: `POST`
+
+**Headers:**
+```
+Authorization: Bearer <access_token>
+```
+
+**Request Body (optional):**
+```json
+{
+  "refreshToken": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
+}
+```
+
+**Response (200):**
+```json
+{
+  "message": "Logged out successfully"
+}
+```
+
+---
+
+#### Get Current Admin User
+
+**Full URL**: `http://localhost/api/admin-api/user`
+
+**Method**: `GET`
 
 **Headers:**
 ```
@@ -511,10 +1979,6 @@ Authorization: Bearer <access_token>
   "isActive": true
 }
 ```
-
-**Error Responses:**
-- `401`: Unauthorized
-- `403`: User is not an admin
 
 ---
 
