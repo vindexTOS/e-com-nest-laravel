@@ -14,6 +14,11 @@ import {
   LoginDto,
   RefreshTokenDto,
 } from '../../../domain/dto/auth';
+import {
+  IAuthResponse,
+  IRefreshTokenResponse,
+  ILogoutResponse,
+} from '../../../domain/interfaces';
 import { JwtAuthGuard } from '../../../infrastructure/libs/guards/jwt-auth.guard';
 import { Public } from '../../../infrastructure/libs/decorators/public.decorator';
 import { ApiController } from '../../../infrastructure/libs/swagger/api-docs.decorator';
@@ -33,17 +38,7 @@ export class AuthController {
   @Post('register')
   @HttpCode(HttpStatus.CREATED)
   @ApiRegister()
-  async register(@Body() registerDto: RegisterDto): Promise<{
-    accessToken: string;
-    refreshToken: string;
-    user: {
-      id: string;
-      email: string;
-      firstName: string;
-      lastName: string;
-      role: string;
-    };
-  }> {
+  async register(@Body() registerDto: RegisterDto): Promise<IAuthResponse> {
     return this.authService.register(registerDto);
   }
 
@@ -51,17 +46,7 @@ export class AuthController {
   @Post('login')
   @HttpCode(HttpStatus.OK)
   @ApiLogin()
-  async login(@Body() loginDto: LoginDto): Promise<{
-    accessToken: string;
-    refreshToken: string;
-    user: {
-      id: string;
-      email: string;
-      firstName: string;
-      lastName: string;
-      role: string;
-    };
-  }> {
+  async login(@Body() loginDto: LoginDto): Promise<IAuthResponse> {
     return this.authService.login(loginDto);
   }
 
@@ -71,7 +56,7 @@ export class AuthController {
   @ApiRefreshToken()
   async refresh(
     @Body() refreshTokenDto: RefreshTokenDto,
-  ): Promise<{ accessToken: string; refreshToken: string }> {
+  ): Promise<IRefreshTokenResponse> {
     return this.authService.refreshToken(refreshTokenDto.refreshToken);
   }
 
@@ -82,7 +67,7 @@ export class AuthController {
   async logout(
     @Req() request: Request,
     @Body() body: { refreshToken?: string },
-  ): Promise<{ message: string }> {
+  ): Promise<ILogoutResponse> {
     const authHeader = request.headers.authorization;
     const accessToken = authHeader?.replace('Bearer ', '') || '';
     await this.authService.logout(accessToken, body.refreshToken);

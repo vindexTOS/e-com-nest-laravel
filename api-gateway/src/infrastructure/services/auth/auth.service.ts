@@ -12,6 +12,10 @@ import { User, UserRole } from '../../../domain/entities/user.entity';
 import { JwtPayload } from '../../authentication/jwt.strategy';
 import { RedisService } from '../../cache/redis.service';
 import { RegisterDto, LoginDto } from '../../../domain/dto/auth';
+import {
+  IAuthResponse,
+  IRefreshTokenResponse,
+} from '../../../domain/interfaces';
 
 @Injectable()
 export class AuthService {
@@ -23,17 +27,7 @@ export class AuthService {
     private redisService: RedisService,
   ) {}
 
-  async register(registerDto: RegisterDto): Promise<{
-    accessToken: string;
-    refreshToken: string;
-    user: {
-      id: string;
-      email: string;
-      firstName: string;
-      lastName: string;
-      role: string;
-    };
-  }> {
+  async register(registerDto: RegisterDto): Promise<IAuthResponse> {
     const existingUser = await this.userRepository.findOne({
       where: { email: registerDto.email },
     });
@@ -60,17 +54,7 @@ export class AuthService {
     return this.generateTokens(user);
   }
 
-  async login(loginDto: LoginDto): Promise<{
-    accessToken: string;
-    refreshToken: string;
-    user: {
-      id: string;
-      email: string;
-      firstName: string;
-      lastName: string;
-      role: string;
-    };
-  }> {
+  async login(loginDto: LoginDto): Promise<IAuthResponse> {
     const user = await this.userRepository.findOne({
       where: { email: loginDto.email },
     });
@@ -96,7 +80,7 @@ export class AuthService {
 
   async refreshToken(
     refreshToken: string,
-  ): Promise<{ accessToken: string; refreshToken: string }> {
+  ): Promise<IRefreshTokenResponse> {
     try {
       const jwtSecret =
         this.configService.get<string>('JWT_SECRET') ||
@@ -132,17 +116,7 @@ export class AuthService {
     }
   }
 
-  async generateTokens(user: User): Promise<{
-    accessToken: string;
-    refreshToken: string;
-    user: {
-      id: string;
-      email: string;
-      firstName: string;
-      lastName: string;
-      role: string;
-    };
-  }> {
+  async generateTokens(user: User): Promise<IAuthResponse> {
     const payload: JwtPayload = {
       sub: user.id,
       email: user.email,
@@ -178,7 +152,7 @@ export class AuthService {
         email: user.email,
         firstName: user.firstName,
         lastName: user.lastName,
-        role: user.role,
+        role: user.role as string,
       },
     };
   }
