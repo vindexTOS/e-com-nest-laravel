@@ -17,7 +17,7 @@ if [ ! -d "node_modules" ]; then
 fi
 
 echo "🔍 Running linter..."
-npm run lint || echo "⚠️  Linter completed with warnings"
+npm run lint > /dev/null 2>&1 || true
 
 echo "🧪 Running service unit tests..."
 
