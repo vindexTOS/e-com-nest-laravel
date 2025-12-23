@@ -247,27 +247,35 @@ jobs:
             echo "📥 Pulling latest changes..."
             git reset --hard origin/main || git reset --hard origin/master
             
-            echo "🐳 Stopping existing containers..."
-            docker-compose down || true
-            
-            echo "🔨 Rebuilding Docker images..."
-            docker-compose build --no-cache
-            
-            echo "▶️  Starting containers..."
-            docker-compose up -d
-            
-            echo "⏳ Waiting for services to be ready..."
-            sleep 15
-            
-            echo "🗄️  Running migrations..."
-            docker-compose exec -T api-gateway npm run migration:run || true
-            docker-compose exec -T admin-service php artisan migrate --force || true
-            
-            echo "🧹 Cleaning up unused Docker resources..."
-            docker system prune -f
-            
-            echo "📊 Container status:"
-            docker-compose ps
+            # Make deployment script executable and run it
+            if [ -f "cicd/deploy.sh" ]; then
+              chmod +x cicd/deploy.sh
+              SKIP_GIT_PULL=true bash cicd/deploy.sh
+            else
+              # Fallback to inline deployment if script doesn't exist
+              echo "⚠️  cicd/deploy.sh not found, using inline deployment..."
+              echo "🐳 Stopping existing containers..."
+              docker-compose down || true
+              
+              echo "🔨 Rebuilding Docker images..."
+              docker-compose build --no-cache
+              
+              echo "▶️  Starting containers..."
+              docker-compose up -d
+              
+              echo "⏳ Waiting for services to be ready..."
+              sleep 15
+              
+              echo "🗄️  Running migrations..."
+              docker-compose exec -T api-gateway npm run migration:run || true
+              docker-compose exec -T admin-service php artisan migrate --force || true
+              
+              echo "🧹 Cleaning up unused Docker resources..."
+              docker system prune -f
+              
+              echo "📊 Container status:"
+              docker-compose ps
+            fi
             
             echo "✅ Deployment completed successfully!"
 
