@@ -7,7 +7,7 @@ import {
   DefaultValuePipe,
 } from '@nestjs/common';
 import { Inject } from '@nestjs/common';
-import { ICategoriesService } from '../../../domain/interfaces/services';
+import type { ICategoriesService } from '../../../domain/interfaces/services';
 import { Public } from '../../../infrastructure/libs/decorators/public.decorator';
 import { ApiController } from '../../../infrastructure/libs/swagger/api-docs.decorator';
 

@@ -14,7 +14,7 @@ import {
   ApiResponse,
 } from '@nestjs/swagger';
 import { Inject } from '@nestjs/common';
-import { IPaymentService } from '../../../domain/interfaces/services';
+import type { IPaymentService } from '../../../domain/interfaces/services';
 import { JwtAuthGuard } from '../../../infrastructure/libs/guards/jwt-auth.guard';
 import { RolesGuard } from '../../../infrastructure/libs/guards/roles.guard';
 import { Roles } from '../../../infrastructure/libs/decorators/roles.decorator';

@@ -11,7 +11,7 @@ import {
   UseGuards,
   Inject,
 } from '@nestjs/common';
-import { IProductsService } from '../../../domain/interfaces/services';
+import type { IProductsService } from '../../../domain/interfaces/services';
 import { Public } from '../../../infrastructure/libs/decorators/public.decorator';
 import { ApiController } from '../../../infrastructure/libs/swagger/api-docs.decorator';
 import {

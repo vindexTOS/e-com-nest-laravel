@@ -1,6 +1,6 @@
 import { Controller, Get, Post, Param, Query, UseGuards } from '@nestjs/common';
 import { Inject } from '@nestjs/common';
-import { INotificationsService } from '../../../domain/interfaces/services';
+import type { INotificationsService } from '../../../domain/interfaces/services';
 import { JwtAuthGuard } from '../../../infrastructure/libs/guards/jwt-auth.guard';
 import { RolesGuard } from '../../../infrastructure/libs/guards/roles.guard';
 import { Roles } from '../../../infrastructure/libs/decorators/roles.decorator';

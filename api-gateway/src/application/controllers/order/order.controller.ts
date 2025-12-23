@@ -8,7 +8,7 @@ import {
   UseGuards,
 } from '@nestjs/common';
 import { Inject } from '@nestjs/common';
-import { IOrdersService, CreateOrderDto } from '../../../domain/interfaces/services';
+import type { IOrdersService, CreateOrderDto } from '../../../domain/interfaces/services';
 import { JwtAuthGuard } from '../../../infrastructure/libs/guards/jwt-auth.guard';
 import { RolesGuard } from '../../../infrastructure/libs/guards/roles.guard';
 import { Roles } from '../../../infrastructure/libs/decorators/roles.decorator';
