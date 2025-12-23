@@ -248,9 +248,9 @@ jobs:
             git reset --hard origin/main || git reset --hard origin/master
             
             # Make deployment script executable and run it
-            if [ -f "deploy.sh" ]; then
-              chmod +x deploy.sh
-              SKIP_GIT_PULL=true bash deploy.sh
+            if [ -f "cicd/deploy.sh" ]; then
+              chmod +x cicd/deploy.sh
+              SKIP_GIT_PULL=true bash cicd/deploy.sh
             else
               # Fallback to inline deployment if script doesn't exist
               echo "⚠️  cicd/deploy.sh not found, using inline deployment..."
