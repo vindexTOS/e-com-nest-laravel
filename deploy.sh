@@ -1,13 +1,16 @@
 #!/bin/bash
 
- 
-
 set -e
 
 echo "🚀 Starting deployment..."
 
-
 cd "$(dirname "$0")"
+
+# Sync environment variables first
+if [ -f "sync-env.sh" ]; then
+    echo "🔄 Syncing environment variables..."
+    bash sync-env.sh
+fi
 
 
 if [ "$SKIP_GIT_PULL" != "true" ]; then
@@ -38,11 +41,6 @@ sleep 10
 echo "🗄️  Running migrations..."
 docker-compose exec -T api-gateway npm run migration:run || true
 docker-compose exec -T admin-service php artisan migrate --force || true
-
-
-echo "🧹 Cleaning up unused Docker resources..."
-docker system prune -f
-
 
 echo "📊 Container status:"
 docker-compose ps
