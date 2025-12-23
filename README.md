@@ -6,9 +6,6 @@ Hybrid e-commerce platform with Nest.js API Gateway and Laravel Admin Panel. Bui
 
 - [Architecture Overview](#architecture-overview)
 - [Quick Start Setup](#quick-start-setup)
-- [NestJS Clean Architecture](#nestjs-clean-architecture-overview)
-- [Database Replication](#database-replication-setup)
-- [Nginx Reverse Proxy](#nginx-reverse-proxy)
 - [Accessing the Application](#accessing-the-application)
 - [API Documentation](#api-documentation)
 - [Authentication Flow](#authentication-flow)
