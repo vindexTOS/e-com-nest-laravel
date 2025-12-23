@@ -10,6 +10,10 @@ import { User } from '../../../domain/entities/user.entity';
 import { Order } from '../../../domain/entities/order.entity';
 import { ProcessPaymentDto } from '../../../domain/dto/payment/process-payment.dto';
 import { AddBalanceDto } from '../../../domain/dto/payment/add-balance.dto';
+import {
+  IBalanceResponse,
+  IProcessPaymentResponse,
+} from '../../../domain/interfaces';
 
 @Injectable()
 export class PaymentService {
@@ -27,7 +31,7 @@ export class PaymentService {
   async addBalance(
     userId: string,
     addBalanceDto: AddBalanceDto,
-  ): Promise<{ balance: number; message: string }> {
+  ): Promise<IBalanceResponse> {
     const queryRunner = this.writeDataSource.createQueryRunner();
     await queryRunner.connect();
     let transactionStarted = false;
@@ -78,7 +82,7 @@ export class PaymentService {
 
   async getBalance(
     userId: string,
-  ): Promise<{ balance: number; message: string }> {
+  ): Promise<IBalanceResponse> {
     const user = await this.writeUserRepository.findOne({
       where: { id: userId },
     });
@@ -98,7 +102,7 @@ export class PaymentService {
   async processPayment(
     userId: string,
     processPaymentDto: ProcessPaymentDto,
-  ): Promise<{ success: boolean; message: string; order: Order }> {
+  ): Promise<IProcessPaymentResponse> {
     const queryRunner = this.writeDataSource.createQueryRunner();
     await queryRunner.connect();
     let transactionStarted = false;

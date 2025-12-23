@@ -5,6 +5,7 @@ import { Notification } from '../../../domain/entities/notification.entity';
 import { HttpService } from '@nestjs/axios';
 import { ConfigService } from '@nestjs/config';
 import { firstValueFrom } from 'rxjs';
+import { INotificationsListResponse } from '../../../domain/interfaces';
 
 @Injectable()
 export class NotificationsService {
@@ -28,7 +29,7 @@ export class NotificationsService {
       offset?: number;
       unreadOnly?: boolean;
     } = {},
-  ): Promise<{ data: Notification[]; total: number; unreadCount: number }> {
+  ): Promise<INotificationsListResponse> {
     const query = this.notificationRepository
       .createQueryBuilder('notification')
       .where('notification.userId IS NULL') // For all admins

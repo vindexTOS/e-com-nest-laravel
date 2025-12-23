@@ -22,6 +22,10 @@ import type { CurrentUserPayload } from '../../../infrastructure/libs/decorators
 import { UserRole } from '../../../domain/entities/user.entity';
 import { ProcessPaymentDto } from '../../../domain/dto/payment/process-payment.dto';
 import { AddBalanceDto } from '../../../domain/dto/payment/add-balance.dto';
+import {
+  IBalanceResponse,
+  IProcessPaymentResponse,
+} from '../../../domain/interfaces';
 
 @ApiTags('Payment')
 @Controller('payment')
@@ -38,7 +42,7 @@ export class PaymentController {
   async addBalance(
     @Body() addBalanceDto: AddBalanceDto,
     @CurrentUser() user: CurrentUserPayload,
-  ) {
+  ): Promise<IBalanceResponse> {
     return this.paymentService.addBalance(user.id, addBalanceDto);
   }
 
@@ -46,7 +50,7 @@ export class PaymentController {
   @Roles(UserRole.CUSTOMER, UserRole.ADMIN)
   @ApiOperation({ summary: 'Get current user balance' })
   @ApiResponse({ status: 200, description: 'Balance retrieved successfully' })
-  async getBalance(@CurrentUser() user: CurrentUserPayload) {
+  async getBalance(@CurrentUser() user: CurrentUserPayload): Promise<IBalanceResponse> {
     return this.paymentService.getBalance(user.id);
   }
 
@@ -58,7 +62,7 @@ export class PaymentController {
   async processPayment(
     @Body() processPaymentDto: ProcessPaymentDto,
     @CurrentUser() user: CurrentUserPayload,
-  ) {
+  ): Promise<IProcessPaymentResponse> {
     return this.paymentService.processPayment(user.id, processPaymentDto);
   }
 }

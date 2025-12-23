@@ -19,6 +19,7 @@ import {
   IRefreshTokenResponse,
   ILogoutResponse,
 } from '../../../domain/interfaces';
+import type { ILogoutBody } from '../../../domain/interfaces';
 import { JwtAuthGuard } from '../../../infrastructure/libs/guards/jwt-auth.guard';
 import { Public } from '../../../infrastructure/libs/decorators/public.decorator';
 import { ApiController } from '../../../infrastructure/libs/swagger/api-docs.decorator';
@@ -66,7 +67,7 @@ export class AuthController {
   @ApiLogout()
   async logout(
     @Req() request: Request,
-    @Body() body: { refreshToken?: string },
+    @Body() body: ILogoutBody,
   ): Promise<ILogoutResponse> {
     const authHeader = request.headers.authorization;
     const accessToken = authHeader?.replace('Bearer ', '') || '';
