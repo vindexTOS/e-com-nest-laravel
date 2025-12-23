@@ -37,7 +37,7 @@ The whole system is containerized with Docker Compose, making it easy to spin up
 ### Step 1: Clone and Start
 
 ```bash
-git clone <repository-url>
+git clone https://github.com/vindexTOS/e-com-nest-laravel.git
 cd e-com-nest-laravel
 docker compose up -d --build
 ```
