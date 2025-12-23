@@ -13,7 +13,8 @@ import {
   ApiBearerAuth,
   ApiResponse,
 } from '@nestjs/swagger';
-import { PaymentService } from '../../../infrastructure/services/payment/payment.service';
+import { Inject } from '@nestjs/common';
+import { IPaymentService } from '../../../domain/interfaces/services';
 import { JwtAuthGuard } from '../../../infrastructure/libs/guards/jwt-auth.guard';
 import { RolesGuard } from '../../../infrastructure/libs/guards/roles.guard';
 import { Roles } from '../../../infrastructure/libs/decorators/roles.decorator';
@@ -32,7 +33,10 @@ import {
 @UseGuards(JwtAuthGuard, RolesGuard)
 @ApiBearerAuth()
 export class PaymentController {
-  constructor(private readonly paymentService: PaymentService) {}
+  constructor(
+    @Inject('IPaymentService')
+    private readonly paymentService: IPaymentService,
+  ) {}
 
   @Post('add-balance')
   @Roles(UserRole.CUSTOMER, UserRole.ADMIN)

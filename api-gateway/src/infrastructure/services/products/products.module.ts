@@ -1,6 +1,7 @@
 import { Module } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { ProductsService } from './products.service';
+import { IProductsService } from '../../../domain/interfaces/services';
 import { RedisModule } from '../../cache/redis.module';
 import { ElasticsearchModule } from '../../search/elasticsearch.module';
 import { DatabaseModule } from '../../persistence/database.module';
@@ -14,7 +15,13 @@ import { Product } from '../../../domain/entities/product.entity';
     RedisModule,
     ElasticsearchModule,
   ],
-  providers: [ProductsService],
-  exports: [ProductsService],
+  providers: [
+    ProductsService,
+    {
+      provide: 'IProductsService',
+      useClass: ProductsService,
+    },
+  ],
+  exports: ['IProductsService', ProductsService],
 })
 export class ProductsModule {}

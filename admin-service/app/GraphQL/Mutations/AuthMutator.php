@@ -61,8 +61,7 @@ class AuthMutator
             ]);
         }
 
-        // Get the raw password from database to avoid cast issues
-        $passwordHash = $user->getRawOriginal('password') ?? $user->getAttributes()['password'] ?? $user->password;
+         $passwordHash = $user->getRawOriginal('password') ?? $user->getAttributes()['password'] ?? $user->password;
 
         if (!Hash::check($data['password'], $passwordHash)) {
             throw ValidationException::withMessages([
@@ -92,8 +91,7 @@ class AuthMutator
             'password' => 'required|string|min:6',
         ])->validate();
 
-        // Use withTrashed to ensure we check all users, but filter out deleted ones
-        $user = User::where('email', $data['email'])->first();
+         $user = User::where('email', $data['email'])->first();
 
         if (!$user) {
             throw ValidationException::withMessages([
@@ -101,8 +99,7 @@ class AuthMutator
             ]);
         }
 
-        // Get the raw password from database to avoid cast issues
-        $passwordHash = $user->getRawOriginal('password') ?? $user->getAttributes()['password'] ?? $user->password;
+         $passwordHash = $user->getRawOriginal('password') ?? $user->getAttributes()['password'] ?? $user->password;
 
         if (!Hash::check($data['password'], $passwordHash)) {
             throw ValidationException::withMessages([

@@ -1,33 +1,15 @@
 import { Module } from '@nestjs/common';
 import { ConfigModule } from '@nestjs/config';
-import { APP_GUARD } from '@nestjs/core';
-import { TypeOrmModule } from '@nestjs/typeorm';
 import { HttpModule } from '@nestjs/axios';
 import { DatabaseModule } from './infrastructure/persistence/database.module';
 import { RedisModule } from './infrastructure/cache/redis.module';
 import { ElasticsearchModule } from './infrastructure/search/elasticsearch.module';
-import { AuthModule } from './infrastructure/authentication/auth.module';
 import { GqlModule } from './infrastructure/graphql/graphql.module';
-import { JwtAuthGuard } from './infrastructure/libs/guards/jwt-auth.guard';
-import { RolesGuard } from './infrastructure/libs/guards/roles.guard';
-import { JwtWsGuard } from './infrastructure/libs/guards/jwt-ws.guard';
-import { User } from './domain/entities/user.entity';
-import { ProductController } from './application/controllers/product/product.controller';
-import { OrderController } from './application/controllers/order/order.controller';
-import { UserController } from './application/controllers/user/user.controller';
-import { StorageController } from './application/controllers/storage/storage.controller';
-import { NotificationController } from './application/controllers/notification/notification.controller';
-import { PaymentController } from './application/controllers/payment/payment.controller';
-import { UsersService } from './infrastructure/services/users/users.service';
-import { ProductsModule } from './infrastructure/services/products/products.module';
-import { CategoriesModule } from './infrastructure/services/categories/categories.module';
-import { OrdersModule } from './infrastructure/services/orders/orders.module';
-import { NotificationsModule } from './infrastructure/services/notifications/notifications.module';
 import { EmailModule } from './infrastructure/services/email/email.module';
 import { EventsModule } from './infrastructure/events/events.module';
 import { QueueModule } from './infrastructure/queue/queue.module';
-import { PaymentModule } from './infrastructure/services/payment/payment.module';
-import { UsersGateway } from './infrastructure/websockets/users.gateway';
+import { ControllersModule } from './application/controllers/controllers.module';
+import { InfrastructureModule } from './infrastructure/infrastructure.module';
 
 @Module({
   imports: [
@@ -38,40 +20,14 @@ import { UsersGateway } from './infrastructure/websockets/users.gateway';
     }),
     HttpModule,
     DatabaseModule,
-    TypeOrmModule.forFeature([User]),
     RedisModule,
     ElasticsearchModule,
-    AuthModule,
     GqlModule,
-    ProductsModule,
-    CategoriesModule,
-    OrdersModule,
-    NotificationsModule,
     EmailModule,
     QueueModule,
-    PaymentModule,
     EventsModule,
-  ],
-  controllers: [
-    ProductController,
-    OrderController,
-    UserController,
-    StorageController,
-    NotificationController,
-    PaymentController,
-  ],
-  providers: [
-    UsersService,
-    UsersGateway,
-    JwtWsGuard,
-    {
-      provide: APP_GUARD,
-      useClass: JwtAuthGuard,
-    },
-    {
-      provide: APP_GUARD,
-      useClass: RolesGuard,
-    },
+    ControllersModule,
+    InfrastructureModule,
   ],
 })
 export class AppModule {}

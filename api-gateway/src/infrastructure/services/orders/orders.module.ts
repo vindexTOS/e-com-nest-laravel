@@ -1,6 +1,7 @@
 import { Module } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { OrdersService } from './orders.service';
+import { IOrdersService } from '../../../domain/interfaces/services';
 import { Order } from '../../../domain/entities/order.entity';
 import { OrderItem } from '../../../domain/entities/order-item.entity';
 import { Product } from '../../../domain/entities/product.entity';
@@ -18,7 +19,13 @@ import { BroadcastingModule } from '../broadcasting/broadcasting.module';
     RedisModule,
     BroadcastingModule,
   ],
-  providers: [OrdersService],
-  exports: [OrdersService],
+  providers: [
+    OrdersService,
+    {
+      provide: 'IOrdersService',
+      useClass: OrdersService,
+    },
+  ],
+  exports: ['IOrdersService', OrdersService],
 })
 export class OrdersModule {}

@@ -24,8 +24,7 @@ class NotificationMutator
 
     public function markAllAsRead($_, array $args)
     {
-        // Get notifications to update before updating
-        $notificationsToUpdate = Notification::whereNull('user_id')
+         $notificationsToUpdate = Notification::whereNull('user_id')
             ->whereNull('read_at')
             ->get();
 

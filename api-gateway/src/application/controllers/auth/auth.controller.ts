@@ -6,9 +6,10 @@ import {
   HttpStatus,
   UseGuards,
   Req,
+  Inject,
 } from '@nestjs/common';
 import type { Request } from 'express';
-import { AuthService } from '../../../infrastructure/services/auth/auth.service';
+import { IAuthService } from '../../../domain/interfaces/services';
 import {
   RegisterDto,
   LoginDto,
@@ -33,7 +34,10 @@ import {
 @ApiController('Authentication')
 @Controller('auth')
 export class AuthController {
-  constructor(private readonly authService: AuthService) {}
+  constructor(
+    @Inject('IAuthService')
+    private readonly authService: IAuthService,
+  ) {}
 
   @Public()
   @Post('register')

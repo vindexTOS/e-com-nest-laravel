@@ -53,14 +53,12 @@ class BalanceMutator
             throw new Error('Maximum deposit is $10,000');
         }
 
-        // Mock card validation (just check format)
-        $cardNumber = preg_replace('/\s+/', '', $input['card_number']);
+         $cardNumber = preg_replace('/\s+/', '', $input['card_number']);
         if (strlen($cardNumber) < 13 || strlen($cardNumber) > 19) {
             throw new Error('Invalid card number');
         }
 
-        // Add balance to user
-        $user->balance = floatval($user->balance ?? 0) + $amount;
+         $user->balance = floatval($user->balance ?? 0) + $amount;
         $user->save();
 
         return [

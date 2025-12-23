@@ -64,8 +64,7 @@ class OrderMutator
                     'total_price' => $totalPrice,
                 ];
 
-                // Deduct stock immediately
-                $product->deductStock($itemData['quantity']);
+                 $product->deductStock($itemData['quantity']);
                 $product->save();
             }
 
@@ -74,8 +73,7 @@ class OrderMutator
             $discount = 0;
             $total = $subtotal + $tax + $shipping - $discount;
 
-            // Check user balance
-            $user = User::findOrFail($data['user_id']);
+             $user = User::findOrFail($data['user_id']);
             $userBalance = floatval($user->balance ?? 0);
             
             if ($userBalance < $total) {
@@ -85,8 +83,7 @@ class OrderMutator
                 ]);
             }
 
-            // Deduct balance from user
-            $user->balance = $userBalance - $total;
+             $user->balance = $userBalance - $total;
             $user->save();
 
             $order = Order::create([
@@ -111,8 +108,7 @@ class OrderMutator
                 OrderItem::create(array_merge($item, ['order_id' => $order->id]));
             }
 
-            // Payment already processed via balance deduction
-            $order->payment_status = 'paid';
+             $order->payment_status = 'paid';
             $order->payment_method = 'wallet_balance';
             $order->status = 'processing';
             $order->save();

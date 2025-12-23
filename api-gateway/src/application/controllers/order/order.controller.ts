@@ -7,8 +7,8 @@ import {
   Body,
   UseGuards,
 } from '@nestjs/common';
-import { OrdersService } from '../../../infrastructure/services/orders/orders.service';
-import type { CreateOrderDto } from '../../../infrastructure/services/orders/orders.service';
+import { Inject } from '@nestjs/common';
+import { IOrdersService, CreateOrderDto } from '../../../domain/interfaces/services';
 import { JwtAuthGuard } from '../../../infrastructure/libs/guards/jwt-auth.guard';
 import { RolesGuard } from '../../../infrastructure/libs/guards/roles.guard';
 import { Roles } from '../../../infrastructure/libs/decorators/roles.decorator';
@@ -21,7 +21,10 @@ import { ApiOperation, ApiResponse, ApiBearerAuth } from '@nestjs/swagger';
 @ApiController('Orders')
 @Controller('orders')
 export class OrderController {
-  constructor(private readonly ordersService: OrdersService) {}
+  constructor(
+    @Inject('IOrdersService')
+    private readonly ordersService: IOrdersService,
+  ) {}
 
   @UseGuards(JwtAuthGuard)
   @Get()

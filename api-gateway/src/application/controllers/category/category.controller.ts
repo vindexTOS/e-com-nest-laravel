@@ -6,14 +6,18 @@ import {
   ParseIntPipe,
   DefaultValuePipe,
 } from '@nestjs/common';
-import { CategoriesService } from '../../../infrastructure/services/categories/categories.service';
+import { Inject } from '@nestjs/common';
+import { ICategoriesService } from '../../../domain/interfaces/services';
 import { Public } from '../../../infrastructure/libs/decorators/public.decorator';
 import { ApiController } from '../../../infrastructure/libs/swagger/api-docs.decorator';
 
 @ApiController('Categories')
 @Controller('categories')
 export class CategoryController {
-  constructor(private categoriesService: CategoriesService) {}
+  constructor(
+    @Inject('ICategoriesService')
+    private categoriesService: ICategoriesService,
+  ) {}
 
   @Public()
   @Get()

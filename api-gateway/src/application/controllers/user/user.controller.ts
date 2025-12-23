@@ -1,12 +1,15 @@
-import { Controller, Get, Query } from '@nestjs/common';
+import { Controller, Get, Query, Inject } from '@nestjs/common';
 import { ApiBearerAuth, ApiOperation, ApiResponse } from '@nestjs/swagger';
-import { UsersService } from '../../../infrastructure/services/users/users.service';
+import { IUsersService } from '../../../domain/interfaces/services';
 import { ApiController } from '../../../infrastructure/libs/swagger/api-docs.decorator';
 
 @ApiController('Users')
 @Controller('users')
 export class UserController {
-  constructor(private readonly usersService: UsersService) {}
+  constructor(
+    @Inject('IUsersService')
+    private readonly usersService: IUsersService,
+  ) {}
 
   @Get()
   @ApiBearerAuth()
