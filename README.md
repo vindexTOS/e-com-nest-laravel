@@ -44,7 +44,8 @@ docker compose up -d --build
 ```
 #### for legacy docker
 ```
-docker-compose up -d --build
+docker-compose build --parallel
+docker-compose up -d
 
 ```
 ```
