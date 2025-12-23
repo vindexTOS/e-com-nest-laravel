@@ -1,4 +1,4 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { Injectable, NotFoundException, Logger } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository, IsNull } from 'typeorm';
 import { Notification } from '../../../domain/entities/notification.entity';
@@ -6,20 +6,28 @@ import { HttpService } from '@nestjs/axios';
 import { ConfigService } from '@nestjs/config';
 import { firstValueFrom } from 'rxjs';
 import { INotificationsListResponse } from '../../../domain/interfaces';
+import { RedisService } from '../../cache/redis.service';
 
 @Injectable()
 export class NotificationsService {
-  private readonly laravelGraphQLUrl: string;
+  private readonly logger = new Logger(NotificationsService.name);
+  private readonly webhookUrl: string;
+  private readonly webhookApiKey: string;
 
   constructor(
     @InjectRepository(Notification)
     private readonly notificationRepository: Repository<Notification>,
     private readonly httpService: HttpService,
     private readonly configService: ConfigService,
+    private readonly redisService: RedisService,
   ) {
-    this.laravelGraphQLUrl = this.configService.get<string>(
-      'LARAVEL_GRAPHQL_URL',
-      'http://admin-service:8000/graphql',
+    this.webhookUrl = this.configService.get<string>(
+      'LARAVEL_WEBHOOK_URL',
+      'http://admin-service:8000/api/webhook',
+    );
+    this.webhookApiKey = this.configService.get<string>(
+      'TEST_WEB_HOOK_KEY',
+      '',
     );
   }
 
@@ -66,70 +74,82 @@ export class NotificationsService {
     if (!notification) {
       throw new NotFoundException(`Notification with ID ${id} not found`);
     }
-    const mutation = `
-      mutation {
-        markNotificationAsRead(id: "${id}") {
-          id
-          read_at
-          updated_at
-        }
-      }
-    `;
 
     try {
       const response = await firstValueFrom(
-        this.httpService.post(this.laravelGraphQLUrl, {
-          query: mutation,
-        }),
+        this.httpService.post(
+          `${this.webhookUrl}/notifications/mark-as-read`,
+          { id },
+          {
+            headers: {
+              'X-API-Key': this.webhookApiKey,
+              'Content-Type': 'application/json',
+            },
+          },
+        ),
       );
 
-      if (response.data.errors) {
-        throw new Error(response.data.errors[0].message);
+      if (!response.data.success) {
+        throw new Error(response.data.error || 'Failed to mark notification as read');
       }
 
-      await new Promise((resolve) => setTimeout(resolve, 500));
+      notification.readAt = response.data.notification.read_at
+        ? new Date(response.data.notification.read_at)
+        : new Date();
 
-      return (
-        (await this.notificationRepository.findOne({
-          where: { id },
-        })) || notification
+      const updated = await this.notificationRepository.save(notification);
+
+      await this.publishDatabaseEvent('notifications', 'UPDATE', updated);
+
+      return updated;
+    } catch (error: any) {
+      throw new NotFoundException(
+        error.response?.data?.error || error.message || `Failed to mark notification as read`,
       );
-    } catch (error) {
-      throw new NotFoundException(`Failed to mark notification as read`);
     }
   }
 
   async markAllAsRead(): Promise<{ message: string; count: number }> {
-    const mutation = `
-      mutation {
-        markAllNotificationsAsRead {
-          message
-          count
-        }
-      }
-    `;
-
     try {
       const response = await firstValueFrom(
-        this.httpService.post(this.laravelGraphQLUrl, {
-          query: mutation,
-        }),
+        this.httpService.post(
+          `${this.webhookUrl}/notifications/mark-all-read`,
+          {},
+          {
+            headers: {
+              'X-API-Key': this.webhookApiKey,
+              'Content-Type': 'application/json',
+            },
+          },
+        ),
       );
 
-      if (response.data.errors) {
-        throw new Error(response.data.errors[0].message);
+      if (!response.data.success) {
+        throw new Error(response.data.error || 'Failed to mark all notifications as read');
       }
 
-      const result = response.data.data.markAllNotificationsAsRead;
+      const updatedNotifications = await this.notificationRepository.find({
+        where: { userId: IsNull(), readAt: IsNull() },
+      });
 
-      await new Promise((resolve) => setTimeout(resolve, 500));
+      await this.notificationRepository.update(
+        { userId: IsNull(), readAt: IsNull() },
+        { readAt: new Date() },
+      );
+
+      for (const notification of updatedNotifications) {
+        notification.readAt = new Date();
+        await this.publishDatabaseEvent('notifications', 'UPDATE', notification);
+      }
 
       return {
-        message: result.message,
-        count: result.count,
+        message: response.data.message,
+        count: response.data.count,
       };
-    } catch (error) {
-      throw new Error(`Failed to mark all notifications as read`);
+    } catch (error: any) {
+      throw new Error(
+        error.response?.data?.error || error.message || `Failed to mark all notifications as read`,
+      );
     }
   }
 
@@ -180,5 +200,43 @@ export class NotificationsService {
     });
 
     return this.notificationRepository.save(notification);
+  }
+
+  private async publishDatabaseEvent(
+    table: string,
+    operation: 'INSERT' | 'UPDATE' | 'DELETE',
+    data: Notification,
+  ): Promise<void> {
+    try {
+      const eventData = {
+        table,
+        operation,
+        data: {
+          id: data.id,
+          user_id: data.userId,
+          type: data.type,
+          title: data.title,
+          message: data.message,
+          data: data.data,
+          read_at: data.readAt,
+          created_at: data.createdAt,
+          updated_at: data.updatedAt,
+        },
+        id: data.id,
+        timestamp: new Date().toISOString(),
+      };
+
+      const message = JSON.stringify(eventData);
+      await this.redisService.publish('database:events', message);
+
+      this.logger.log(
+        `Published database event: ${operation} on ${table} (${data.id})`,
+      );
+    } catch (error: any) {
+      this.logger.error(
+        `Failed to publish database event: ${error.message}`,
+        error.stack,
+      );
+    }
   }
 }

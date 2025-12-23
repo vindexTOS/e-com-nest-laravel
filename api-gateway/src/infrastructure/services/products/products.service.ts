@@ -68,8 +68,7 @@ export class ProductsService implements OnModuleInit {
         await this.checkAndSync();
       } catch (error) {
         this.logger.error('Failed to perform initial sync:', error);
-        // Retry after another delay
-        setTimeout(async () => {
+         setTimeout(async () => {
           try {
             await this.checkAndSync();
           } catch (retryError) {

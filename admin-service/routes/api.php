@@ -1,5 +1,9 @@
 <?php
 
 use Illuminate\Support\Facades\Route;
+use App\Http\Controllers\WebhookController;
 
-// REST endpoints were replaced by the Lighthouse GraphQL endpoint defined in config/lighthouse.php.
+Route::prefix('webhook')->middleware('webhook.api')->group(function () {
+    Route::post('/notifications/mark-as-read', [WebhookController::class, 'markNotificationAsRead']);
+    Route::post('/notifications/mark-all-read', [WebhookController::class, 'markAllNotificationsAsRead']);
+});

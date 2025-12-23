@@ -20,7 +20,7 @@ For the NestJS side, I went with Clean Architecture, separating the codebase int
 
 On the Laravel side, I chose GraphQL for all endpoints because the assignment specifically asked for it. NestJS also has a GraphQL endpoint, so you can use either REST or GraphQL depending on your preference.
 
-The system uses an event-driven architecture, especially for the ordering flow. When an order is created, we emit several events - one for sending emails, another for payment processing, and so on. I didn't use webhooks because I thought they were redundant since we already have Redis handling inter-service communication.
+The system uses an event-driven architecture, especially for the ordering flow. When an order is created, we emit several events - one for sending emails, another for payment processing, and so on. For notification updates, I'm using webhooks with API key authentication for demonstration purposes, which call Laravel endpoints that update the write database and publish Redis events for syncing to the read database.
 
 Speaking of Redis, I'm using it to sync data between the read and write databases. When something changes in the write database, we publish a Redis event that triggers a sync to the read database. This keeps both databases in sync without adding unnecessary complexity.
 
@@ -122,9 +122,14 @@ Authorization: Bearer <your-access-token>
 ```
 
 **How to get a token:**
-1. Register: `POST http://localhost/api/gateway/auth/register`
-2. Login: `POST http://localhost/api/gateway/auth/login`
+1. **GraphQL API**: Login via GraphQL mutation at `http://localhost/admin-api/graphql` (see [GraphQL API](#graphql-api) section)
+   - Use `login` mutation for customers
+   - Use `adminLogin` mutation for admins
+   - Use `register` mutation to create new accounts
+2. **NestJS REST API**: Register via `POST http://localhost/api/gateway/auth/register` (creates account and returns token)
 3. Use the `accessToken` from the response
+
+**Note**: All authentication (login, logout, refresh) should be done via GraphQL. Tokens from GraphQL work with all NestJS REST API endpoints as both services share the same JWT secret.
 
 ---
 
@@ -177,97 +182,7 @@ Authorization: Bearer <your-access-token>
 - `400`: Validation error
 - `409`: Email already exists
 
----
-
-#### Login
-
-**Full URL**: `http://localhost/api/gateway/auth/login`
-
-**Method**: `POST`
-
-**Authentication**: Not required (Public)
-
-**Request Body:**
-```json
-{
-  "email": "user@example.com",
-  "password": "password123"
-}
-```
-
-**Response (200):**
-```json
-{
-  "accessToken": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...",
-  "refreshToken": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...",
-  "user": {
-    "id": "uuid",
-    "email": "user@example.com",
-    "firstName": "John",
-    "lastName": "Doe",
-    "role": "customer"
-  }
-}
-```
-
-**Error Responses:**
-- `400`: Validation error
-- `401`: Invalid credentials
-- `403`: Account is inactive
-
----
-
-#### Refresh Token
-
-**Full URL**: `http://localhost/api/gateway/auth/refresh`
-
-**Method**: `POST`
-
-**Authentication**: Not required (Public)
-
-**Request Body:**
-```json
-{
-  "refreshToken": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
-}
-```
-
-**Response (200):**
-```json
-{
-  "accessToken": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...",
-  "refreshToken": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
-}
-```
-
----
-
-#### Logout
-
-**Full URL**: `http://localhost/api/gateway/auth/logout`
-
-**Method**: `POST`
-
-**Authentication**: Required (Bearer token)
-
-**Headers:**
-```
-Authorization: Bearer <access_token>
-```
-
-**Request Body (optional):**
-```json
-{
-  "refreshToken": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
-}
-```
-
-**Response (200):**
-```json
-{
-  "message": "Logged out successfully"
-}
-```
+**Note**: For login, logout, and token refresh, use the GraphQL API at `http://localhost/admin-api/graphql`. See the [GraphQL API](#graphql-api) section for authentication mutations.
 
 ---
 
@@ -454,46 +369,6 @@ Authorization: Bearer <access_token>
 - `401`: Unauthorized
 - `403`: Admin access required
 - `404`: Product not found
-
----
-
-#### Sync Products to Elasticsearch
-
-**Full URL**: `http://localhost/api/gateway/products/sync`
-
-**Method**: `POST`
-
-**Authentication**: Not required (Public)
-
-**Response (200):**
-```json
-{
-  "message": "Products synced successfully",
-  "productsCount": 150
-}
-```
-
-**Note**: Manually syncs all products from read database to **Elasticsearch**.
-
----
-
-#### Sync Products from Write Database
-
-**Full URL**: `http://localhost/api/gateway/products/sync-from-write`
-
-**Method**: `POST`
-
-**Authentication**: Not required (Public)
-
-**Response (200):**
-```json
-{
-  "message": "Products synced successfully",
-  "synced": 150
-}
-```
-
-**Note**: Syncs products from **write database** to **read database** and **Elasticsearch**.
 
 ---
 
@@ -758,12 +633,10 @@ Authorization: Bearer <access_token>
 **Query Parameters:**
 - `limit` (number, optional): Items per page
 - `offset` (number, optional): Pagination offset
-- `search` (string, optional): Search term
-- `role` (string, optional): Filter by role (admin, customer)
 
 **Example:**
 ```
-GET http://localhost/api/gateway/users?limit=20&offset=0&search=john
+GET http://localhost/api/gateway/users?limit=20&offset=0
 ```
 
 **Response (200):**
@@ -997,10 +870,23 @@ Authorization: Bearer <access_token>
   "message": "Notification marked as read",
   "notification": {
     "id": "uuid",
-    "readAt": "2024-12-23T10:00:00Z"
+    "userId": null,
+    "type": "order_created",
+    "title": "New Order Received",
+    "message": "Order ORD-123 placed by User",
+    "data": {},
+    "readAt": "2024-12-23T10:00:00.000Z",
+    "createdAt": "2024-12-23T09:00:00.000Z",
+    "updatedAt": "2024-12-23T10:00:00.000Z"
   }
 }
 ```
+
+**How it works**: 
+- Calls Laravel webhook endpoint with API key authentication
+- Laravel updates **write database** (PostgreSQL) and publishes Redis event
+- NestJS updates **read database** directly and publishes Redis event
+- `DatabaseEventSubscriber` syncs via Redis `database:events` channel
 
 ---
 
@@ -1024,6 +910,12 @@ Authorization: Bearer <access_token>
   "count": 10
 }
 ```
+
+**How it works**: 
+- Calls Laravel webhook endpoint with API key authentication
+- Laravel updates all admin notifications in **write database** (PostgreSQL) and publishes Redis events
+- NestJS updates all unread notifications in **read database** and publishes Redis events
+- `DatabaseEventSubscriber` syncs via Redis `database:events` channel
 
 ---
 
@@ -1069,7 +961,7 @@ GET http://localhost/api/gateway/storage/product-image/mouse.jpg
 
 ### Endpoint
 
-**Full URL**: `http://localhost/graphql`
+**Full URL**: `http://localhost/admin-api/graphql`
 
 **Method**: `POST`
 
@@ -1090,10 +982,10 @@ query {
   adminUser {
     id
     email
-    firstName
-    lastName
+    first_name
+    last_name
     role
-    isActive
+    is_active
   }
 }
 ```
@@ -1118,8 +1010,8 @@ mutation {
     user {
       id
       email
-      firstName
-      lastName
+      first_name
+      last_name
       role
     }
   }
@@ -1141,8 +1033,8 @@ mutation {
     user {
       id
       email
-      firstName
-      lastName
+      first_name
+      last_name
       role
     }
   }
@@ -1164,8 +1056,8 @@ mutation {
     user {
       id
       email
-      firstName
-      lastName
+      first_name
+      last_name
       role
     }
   }
@@ -1180,15 +1072,14 @@ mutation {
 mutation {
   createCategory(input: {
     name: "Electronics"
-    slug: "electronics"
     description: "Electronic products"
-    isActive: true
+    is_active: true
   }) {
     id
     name
     slug
     description
-    isActive
+    is_active
   }
 }
 ```
@@ -1205,12 +1096,12 @@ mutation {
 mutation {
   updateCategory(id: "uuid", input: {
     name: "Updated Electronics"
-    isActive: true
+    is_active: true
   }) {
     id
     name
     slug
-    isActive
+    is_active
   }
 }
 ```
@@ -1353,14 +1244,14 @@ mutation {
   createUser(input: {
     email: "newuser@example.com"
     password: "password123"
-    firstName: "Jane"
-    lastName: "Doe"
+    first_name: "Jane"
+    last_name: "Doe"
     role: customer
   }) {
     id
     email
-    firstName
-    lastName
+    first_name
+    last_name
     role
   }
 }
@@ -1378,14 +1269,14 @@ mutation {
 ```graphql
 mutation {
   updateUser(id: "uuid", input: {
-    firstName: "Updated Name"
-    isActive: true
+    first_name: "Updated Name"
+    is_active: true
   }) {
     id
     email
-    firstName
-    lastName
-    isActive
+    first_name
+    last_name
+    is_active
   }
 }
 ```
@@ -1441,6 +1332,46 @@ mutation {
   }
 }
 ```
+
+---
+
+### Notification Mutations
+
+#### Mark Notification as Read
+
+```graphql
+mutation {
+  markNotificationAsRead(id: "uuid") {
+    id
+    type
+    title
+    message
+    read_at
+    created_at
+  }
+}
+```
+
+**How it works**: 
+- Updates notification in **write database** (PostgreSQL)
+- Publishes Redis event to sync to **read database**
+
+---
+
+#### Mark All Notifications as Read
+
+```graphql
+mutation {
+  markAllNotificationsAsRead {
+    message
+    count
+  }
+}
+```
+
+**How it works**: 
+- Marks all admin notifications (where `user_id` is null) as read in **write database** (PostgreSQL)
+- Publishes Redis events to sync to **read database**
 
 ---
 
@@ -1691,124 +1622,9 @@ channel.listen('new-notification', (notification) => {
 
 ## Laravel Admin Panel API
 
-### Base URL
+**Note**: Laravel REST API endpoints have been replaced by GraphQL. All admin operations should be performed via the GraphQL endpoint at `http://localhost/admin-api/graphql`. See the [GraphQL API](#graphql-api) section above for authentication and all available operations.
 
-**Full URL**: `http://localhost/api/admin-api/`
-
-**Authentication**: Required (Bearer token)
-
-**Headers:**
-```
-Authorization: Bearer <access_token>
-```
-
-### Admin Authentication Endpoints
-
-#### Admin Login
-
-**Full URL**: `http://localhost/api/admin-api/login`
-
-**Method**: `POST`
-
-**Request Body:**
-```json
-{
-  "email": "admin@gmail.com",
-  "password": "1234567"
-}
-```
-
-**Response (200):**
-```json
-{
-  "accessToken": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...",
-  "refreshToken": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...",
-  "user": {
-    "id": "uuid",
-    "email": "admin@gmail.com",
-    "firstName": "Admin",
-    "lastName": "User",
-    "role": "admin"
-  }
-}
-```
-
-**Note**: This token can also be used with Nest.js API endpoints. Both services share the same JWT secret.
-
----
-
-#### Refresh Token
-
-**Full URL**: `http://localhost/api/admin-api/refresh`
-
-**Method**: `POST`
-
-**Request Body:**
-```json
-{
-  "refreshToken": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
-}
-```
-
-**Response (200):**
-```json
-{
-  "accessToken": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...",
-  "refreshToken": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
-}
-```
-
----
-
-#### Admin Logout
-
-**Full URL**: `http://localhost/api/admin-api/logout`
-
-**Method**: `POST`
-
-**Headers:**
-```
-Authorization: Bearer <access_token>
-```
-
-**Request Body (optional):**
-```json
-{
-  "refreshToken": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
-}
-```
-
-**Response (200):**
-```json
-{
-  "message": "Logged out successfully"
-}
-```
-
----
-
-#### Get Current Admin User
-
-**Full URL**: `http://localhost/api/admin-api/user`
-
-**Method**: `GET`
-
-**Headers:**
-```
-Authorization: Bearer <access_token>
-```
-
-**Response (200):**
-```json
-{
-  "id": "uuid",
-  "email": "admin@gmail.com",
-  "firstName": "Admin",
-  "lastName": "User",
-  "role": "admin",
-  "isActive": true
-}
-```
+Tokens generated from GraphQL mutations (login, adminLogin, register) can be used with Nest.js API endpoints as both services share the same JWT secret.
 
 ---
 

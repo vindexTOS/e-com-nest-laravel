@@ -15,6 +15,7 @@ return Application::configure(basePath: dirname(__DIR__))
         $middleware->alias([
             'auth.api' => \App\Http\Middleware\JwtAuthMiddleware::class,
             'role' => \App\Http\Middleware\RoleMiddleware::class,
+            'webhook.api' => \App\Http\Middleware\WebhookApiKeyMiddleware::class,
         ]);
     })
     ->withExceptions(function (Exceptions $exceptions): void {

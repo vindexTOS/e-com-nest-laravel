@@ -236,6 +236,11 @@ export class DatabaseEventSubscriber implements OnModuleInit, OnModuleDestroy {
     const { table, data, id } = event;
 
     const cleanData = this.filterRelationData(data);
+    
+    if (table === 'notifications') {
+      this.logger.log(`Processing notification UPDATE: ${JSON.stringify(cleanData)}`);
+    }
+    
     const updateFields = Object.entries(cleanData)
       .filter(
         ([key]) => key !== 'id' && key !== 'created_at' && key !== 'updated_at',
@@ -243,7 +248,7 @@ export class DatabaseEventSubscriber implements OnModuleInit, OnModuleDestroy {
       .map(([key], index) => `"${key}" = $${index + 1}`);
 
     if (updateFields.length === 0) {
-      this.logger.warn(`No fields to update for table ${table}, id ${id}`);
+      this.logger.warn(`No fields to update for table ${table}, id ${id}. Clean data: ${JSON.stringify(cleanData)}`);
       return;
     }
 
@@ -256,6 +261,10 @@ export class DatabaseEventSubscriber implements OnModuleInit, OnModuleDestroy {
     values.push(id);
 
     const setClause = updateFields.join(', ');
+
+    if (table === 'notifications') {
+      this.logger.log(`Updating notification ${id} with fields: ${setClause}`);
+    }
 
     await queryRunner.query(
       `UPDATE "${table}" SET ${setClause}, "updated_at" = NOW() WHERE "id" = $${values.length}`,
@@ -299,13 +308,12 @@ export class DatabaseEventSubscriber implements OnModuleInit, OnModuleDestroy {
         continue;
       }
 
-      if (
-        key === 'id' ||
-        key === 'created_at' ||
-        key === 'updated_at' ||
-        key === 'deleted_at'
-      ) {
+      if (key === 'id' || key === 'created_at' || key === 'deleted_at') {
         cleanData[key] = value;
+        continue;
+      }
+
+      if (key === 'updated_at') {
         continue;
       }
 

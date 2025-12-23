@@ -62,6 +62,9 @@ services:
       - PUSHER_PORT=${PUSHER_PORT:-6001}
       - PUSHER_SCHEME=${PUSHER_SCHEME:-http}
       - PUSHER_APP_CLUSTER=${PUSHER_APP_CLUSTER:-mt1}
+      # Webhook
+      - LARAVEL_WEBHOOK_URL=${LARAVEL_WEBHOOK_URL:-http://admin-service:8000/api/webhook}
+      - TEST_WEB_HOOK_KEY=${TEST_WEB_HOOK_KEY:-test-webhook-key-change-in-production}
     depends_on:
       postgres-write:
         condition: service_healthy
@@ -190,6 +193,8 @@ services:
       - PUSHER_PORT=6001
       - PUSHER_SCHEME=http
       - PUSHER_APP_CLUSTER=mt1
+      # Webhook
+      - TEST_WEB_HOOK_KEY=${TEST_WEB_HOOK_KEY:-test-webhook-key-change-in-production}
     volumes:
       - admin_storage:/var/www/html/storage
     depends_on:
