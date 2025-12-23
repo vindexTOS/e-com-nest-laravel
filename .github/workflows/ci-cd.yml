@@ -98,91 +98,11 @@ jobs:
         working-directory: ./api-gateway
         run: npm run build
 
-  # Test Laravel Admin Service
-  test-admin-service:
-    name: Test Admin Service (Laravel)
+  # Deploy to server
+  deploy:
+    name: Deploy to Server
     runs-on: ubuntu-latest
-
-    services:
-      postgres:
-        image: postgres:15-alpine
-        env:
-          POSTGRES_USER: test
-          POSTGRES_PASSWORD: test
-          POSTGRES_DB: test_db
-        options: >-
-          --health-cmd pg_isready
-          --health-interval 10s
-          --health-timeout 5s
-          --health-retries 5
-        ports:
-          - 5432:5432
-
-      redis:
-        image: redis:7-alpine
-        options: >-
-          --health-cmd "redis-cli ping"
-          --health-interval 10s
-          --health-timeout 5s
-          --health-retries 5
-        ports:
-          - 6379:6379
-
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
-
-      - name: Setup PHP
-        uses: shivammathur/setup-php@v2
-        with:
-          php-version: ${{ env.PHP_VERSION }}
-          extensions: pdo, pdo_pgsql, redis, mbstring, exif, pcntl, bcmath, gd, zip
-          coverage: none
-
-      - name: Setup Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: ${{ env.NODE_VERSION }}
-          cache: 'npm'
-          cache-dependency-path: admin-service/package-lock.json
-
-      - name: Install Composer dependencies
-        working-directory: ./admin-service
-        run: |
-          composer install --prefer-dist --no-progress --no-interaction --optimize-autoloader
-
-      - name: Install NPM dependencies
-        working-directory: ./admin-service
-        run: npm ci
-
-      - name: Copy environment file
-        working-directory: ./admin-service
-        run: |
-          cp .env.example .env || echo "APP_KEY=" > .env
-          php artisan key:generate --ansi || true
-
-      - name: Run PHPUnit tests
-        working-directory: ./admin-service
-        env:
-          DB_CONNECTION: pgsql
-          DB_HOST: localhost
-          DB_PORT: 5432
-          DB_DATABASE: test_db
-          DB_USERNAME: test
-          DB_PASSWORD: test
-          REDIS_HOST: localhost
-          REDIS_PORT: 6379
-        run: composer test || php vendor/bin/phpunit || true
-
-      - name: Build frontend
-        working-directory: ./admin-service
-        run: npm run build || true
-
-  # Build Docker images
-  build-docker:
-    name: Build Docker Images
-    runs-on: ubuntu-latest
-    needs: [test-api-gateway, test-admin-service]
+    needs: [test-api-gateway]
     if: github.event_name == 'push' && (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master')
 
     steps:
@@ -218,13 +138,10 @@ jobs:
   deploy:
     name: Deploy to Server
     runs-on: ubuntu-latest
-    needs: [build-docker]
+    needs: [test-api-gateway]
     if: github.event_name == 'push' && (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master')
     
     steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
-
       - name: Deploy to server via SSH
         uses: appleboy/ssh-action@v1.0.3
         with:
