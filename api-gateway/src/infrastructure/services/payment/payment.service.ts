@@ -245,25 +245,13 @@ export class PaymentService {
     cardCvv: string,
     amount: number,
   ): void {
-    this.logger.log(
-      '═══════════════════════════════════════════════════════════',
-    );
-    this.logger.log('💳 MOCK PAYMENT - Credit Card Processing');
-    this.logger.log(
-      '═══════════════════════════════════════════════════════════',
-    );
+    this.logger.log('MOCK PAYMENT - Credit Card Processing');
     this.logger.log(`Card Number: ${this.maskCardNumber(cardNumber)}`);
     this.logger.log(`Expiry: ${cardExpiry}`);
     this.logger.log(`CVV: ***`);
     this.logger.log(`Amount: $${amount.toFixed(2)}`);
-    this.logger.log(
-      '───────────────────────────────────────────────────────────',
-    );
-    this.logger.log('✅ MOCK: Payment authorized successfully');
-    this.logger.log('✅ MOCK: Transaction ID: ' + this.generateTransactionId());
-    this.logger.log(
-      '═══════════════════════════════════════════════════════════',
-    );
+    this.logger.log('MOCK: Payment authorized successfully');
+    this.logger.log('MOCK: Transaction ID: ' + this.generateTransactionId());
   }
 
   private maskCardNumber(cardNumber: string): string {

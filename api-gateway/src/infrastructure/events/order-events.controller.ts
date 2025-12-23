@@ -55,7 +55,7 @@ export class OrderEventsController implements OnModuleInit, OnModuleDestroy {
         );
       } else {
         this.logger.log(
-          `✅ Subscribed to ${this.ORDER_EVENTS_CHANNEL} channel (${count} channels)`,
+          `Subscribed to ${this.ORDER_EVENTS_CHANNEL} channel (${count} channels)`,
         );
       }
     });
@@ -63,7 +63,7 @@ export class OrderEventsController implements OnModuleInit, OnModuleDestroy {
     this.subscriber.on('message', async (channel, message) => {
       if (channel === this.ORDER_EVENTS_CHANNEL) {
         this.logger.log(
-          `📨 Received order event on ${channel}: ${message.substring(0, 150)}...`,
+          `Received order event on ${channel}: ${message.substring(0, 150)}...`,
         );
         await this.handleOrderEvent(message);
       } else {
@@ -128,7 +128,7 @@ export class OrderEventsController implements OnModuleInit, OnModuleDestroy {
     }
 
     this.logger.log(
-      `✅ Order event has required data - email: ${userEmail}, order_number: ${orderNumber}`,
+      `Order event has required data - email: ${userEmail}, order_number: ${orderNumber}`,
     );
 
     await this.addOrderConfirmationEmailToQueue(orderData).catch((err) => {
@@ -195,11 +195,11 @@ export class OrderEventsController implements OnModuleInit, OnModuleDestroy {
     };
 
     this.logger.log(
-      `📧 Adding order confirmation email job to queue for: ${jobData.customerEmail}`,
+      `Adding order confirmation email job to queue for: ${jobData.customerEmail}`,
     );
     await this.queueService.addOrderConfirmationEmailJob(jobData);
     this.logger.log(
-      `✅ Order confirmation email job added to queue for order ${jobData.orderNumber}`,
+      `Order confirmation email job added to queue for order ${jobData.orderNumber}`,
     );
   }
 }

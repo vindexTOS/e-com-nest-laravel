@@ -50,7 +50,6 @@ export class ProductsService implements OnModuleInit {
     );
     if (existing) return existing;
 
-    // Initialize lazily so first request doesn't fail on missing key
     const initial = Date.now().toString();
     await this.redisService.set(
       this.PRODUCTS_CACHE_VERSION_KEY,
@@ -64,7 +63,6 @@ export class ProductsService implements OnModuleInit {
     this.logger.log(
       'ProductsService initialized, scheduling Elasticsearch sync...',
     );
-    // Delay sync to allow database and ES to be fully ready
     setTimeout(async () => {
       try {
         await this.checkAndSync();
@@ -488,11 +486,9 @@ export class ProductsService implements OnModuleInit {
   }
 
   async createProduct(createProductDto: CreateProductDto): Promise<Product> {
-    // Generate slug if not provided
     const slug =
       createProductDto.slug || this.generateSlug(createProductDto.name);
 
-    // Write to WRITE database
     const product = this.writeProductRepository.create({
       ...createProductDto,
       slug,
@@ -504,7 +500,6 @@ export class ProductsService implements OnModuleInit {
 
     const saved = await this.writeProductRepository.save(product);
 
-    // Reload with relations to ensure we have fresh data
     const freshProduct = await this.writeProductRepository.findOne({
       where: { id: saved.id },
       relations: ['category'],
@@ -514,10 +509,8 @@ export class ProductsService implements OnModuleInit {
       throw new NotFoundException(`Product not found after creation`);
     }
 
-    // Publish event to Redis for sync (NestJS to NestJS)
     await this.publishProductEvent('INSERT', freshProduct);
 
-    // Sync to Elasticsearch
     await this.syncProductToElasticsearch(freshProduct);
     await this.invalidateProductCache();
 
@@ -528,7 +521,6 @@ export class ProductsService implements OnModuleInit {
     id: string,
     updateProductDto: UpdateProductDto,
   ): Promise<Product> {
-    // Check in write database
     const product = await this.writeProductRepository.findOne({
       where: { id },
       relations: ['category'],
@@ -538,16 +530,13 @@ export class ProductsService implements OnModuleInit {
       throw new NotFoundException(`Product with ID ${id} not found`);
     }
 
-    // Generate slug if name changed and slug not provided
     if (updateProductDto.name && !updateProductDto.slug) {
       updateProductDto.slug = this.generateSlug(updateProductDto.name);
     }
 
     Object.assign(product, updateProductDto);
-    // Write to WRITE database
     const saved = await this.writeProductRepository.save(product);
 
-    // Reload with relations to ensure we have fresh data
     const freshProduct = await this.writeProductRepository.findOne({
       where: { id: saved.id },
       relations: ['category'],
@@ -557,10 +546,8 @@ export class ProductsService implements OnModuleInit {
       throw new NotFoundException(`Product with ID ${id} not found after save`);
     }
 
-    // Publish event to Redis for sync (NestJS to NestJS)
     await this.publishProductEvent('UPDATE', freshProduct);
 
-    // Sync to Elasticsearch
     await this.syncProductToElasticsearch(freshProduct);
     await this.invalidateProductCache();
 

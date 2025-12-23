@@ -140,7 +140,6 @@ export class OrdersService {
     transactionStarted = true;
 
     try {
-      // Get user
       const user = await queryRunner.manager.findOne(User, {
         where: { id: createOrderDto.userId },
       });
@@ -151,10 +150,8 @@ export class OrdersService {
         );
       }
 
-      // Generate order number
       const orderNumber = this.generateOrderNumber();
 
-      // Calculate totals and validate stock
       let subtotal = 0;
       const orderItems: Partial<OrderItem>[] = [];
 
@@ -178,11 +175,9 @@ export class OrdersService {
         const itemTotal = parseFloat(product.price.toString()) * item.quantity;
         subtotal += itemTotal;
 
-        // Deduct stock
         product.stock -= item.quantity;
         await queryRunner.manager.save(Product, product);
 
-        // Prepare order item
         orderItems.push({
           productId: item.productId,
           productName: product.name,
@@ -199,7 +194,6 @@ export class OrdersService {
       const discount = 0;
       const total = subtotal + tax + shipping - discount;
 
-      // Create order
       const order = new Order();
       order.userId = createOrderDto.userId;
       order.orderNumber = orderNumber;
@@ -219,7 +213,6 @@ export class OrdersService {
 
       const savedOrder = await queryRunner.manager.save(Order, order);
 
-      // Create order items
       for (const itemData of orderItems) {
         const orderItem = queryRunner.manager.create(OrderItem, {
           ...itemData,
@@ -228,9 +221,8 @@ export class OrdersService {
         await queryRunner.manager.save(OrderItem, orderItem);
       }
 
-      // Create admin notification
       const notification = queryRunner.manager.create(Notification, {
-        userId: null, // Admin notification
+        userId: null,
         type: 'order_created',
         title: 'New Order Received',
         message: `Order ${orderNumber} placed by ${user.firstName} ${user.lastName} for $${total.toFixed(2)}`,
@@ -249,7 +241,6 @@ export class OrdersService {
         notification,
       );
 
-      // Reload order with relations from write DB before committing
       const freshOrder = await queryRunner.manager.findOne(Order, {
         where: { id: savedOrder.id },
         relations: ['user', 'items', 'items.product'],
@@ -261,7 +252,6 @@ export class OrdersService {
 
       await queryRunner.commitTransaction();
 
-      // Publish database events for sync (write → read DB)
       await this.publishDatabaseEvent('orders', 'INSERT', freshOrder);
 
       for (const item of freshOrder.items) {
@@ -274,10 +264,8 @@ export class OrdersService {
         savedNotification,
       );
 
-      // Publish to order-events channel (for email)
       await this.publishOrderCreatedEvent(freshOrder, user);
 
-      // Broadcast notification via Soketi (for live notifications)
       const notificationData = {
         id: savedNotification.id,
         user_id: savedNotification.userId,
@@ -291,7 +279,6 @@ export class OrdersService {
       };
       await this.soketiService.broadcastAdminNotification(notificationData);
 
-      // Publish to notification-events channel (for WebSocket sync)
       await this.publishNotificationEvent(savedNotification);
 
       this.logger.log(`Order created: ${orderNumber} by user ${user.email}`);

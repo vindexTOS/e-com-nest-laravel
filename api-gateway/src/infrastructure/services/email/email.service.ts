@@ -34,13 +34,7 @@ export class EmailService implements OnModuleInit {
   }
 
   async sendOrderConfirmation(data: OrderConfirmationEmailData): Promise<void> {
-    this.logger.log(
-      '═══════════════════════════════════════════════════════════',
-    );
-    this.logger.log('📧 MOCK EMAIL - Order Confirmation');
-    this.logger.log(
-      '═══════════════════════════════════════════════════════════',
-    );
+    this.logger.log('MOCK EMAIL - Order Confirmation');
     this.logger.log(`To: ${data.customerEmail}`);
     this.logger.log(`Subject: Order Confirmation - ${data.orderNumber}`);
     this.logger.log(`Customer: ${data.customerName}`);
@@ -55,30 +49,18 @@ export class EmailService implements OnModuleInit {
     if (data.shippingAddress) {
       this.logger.log(`Shipping Address: ${data.shippingAddress}`);
     }
-    this.logger.log(
-      '───────────────────────────────────────────────────────────',
-    );
     this.logger.log('Order Items:');
     data.items.forEach((item, index) => {
       this.logger.log(
         `  ${index + 1}. ${item.name} x${item.quantity} @ $${item.price.toFixed(2)} = $${item.total.toFixed(2)}`,
       );
     });
-    this.logger.log(
-      '───────────────────────────────────────────────────────────',
-    );
-    this.logger.log('📧 Email content (HTML preview):');
+    this.logger.log('Email content (HTML preview):');
     this.logger.log(
       this.generateOrderConfirmationHTML(data).substring(0, 500) + '...',
     );
     this.logger.log(
-      '═══════════════════════════════════════════════════════════',
-    );
-    this.logger.log(
-      `✅ MOCK: Order confirmation email would be sent to ${data.customerEmail}`,
-    );
-    this.logger.log(
-      '═══════════════════════════════════════════════════════════',
+      `MOCK: Order confirmation email would be sent to ${data.customerEmail}`,
     );
   }
 
@@ -190,7 +172,7 @@ export class EmailService implements OnModuleInit {
       <body>
         <div class="container">
           <div class="header">
-            <h1>✅ Order Confirmation</h1>
+            <h1>Order Confirmation</h1>
           </div>
           
           <p>Dear ${data.customerName},</p>

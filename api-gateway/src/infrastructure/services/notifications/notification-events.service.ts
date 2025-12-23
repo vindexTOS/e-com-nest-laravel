@@ -82,7 +82,6 @@ export class NotificationEventsService implements OnModuleInit {
         );
         this.logger.log(`Notification synced: ${notification.id}`);
 
-        // Broadcast to WebSocket clients
         if (this.broadcastCallback) {
           this.broadcastCallback(notification);
         }

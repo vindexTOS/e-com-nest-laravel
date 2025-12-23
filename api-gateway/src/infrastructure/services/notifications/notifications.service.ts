@@ -32,7 +32,7 @@ export class NotificationsService {
   ): Promise<INotificationsListResponse> {
     const query = this.notificationRepository
       .createQueryBuilder('notification')
-      .where('notification.userId IS NULL') // For all admins
+      .where('notification.userId IS NULL')
       .orderBy('notification.createdAt', 'DESC');
 
     if (options.unreadOnly) {
@@ -48,7 +48,6 @@ export class NotificationsService {
 
     const [data, total] = await query.getManyAndCount();
 
-    // Get unread count
     const unreadCount = await this.notificationRepository.count({
       where: {
         userId: IsNull(),
@@ -60,7 +59,6 @@ export class NotificationsService {
   }
 
   async markAsRead(id: string): Promise<Notification> {
-    // Check if notification exists in read DB
     const notification = await this.notificationRepository.findOne({
       where: { id },
     });
@@ -68,8 +66,6 @@ export class NotificationsService {
     if (!notification) {
       throw new NotFoundException(`Notification with ID ${id} not found`);
     }
-
-    // Call Laravel GraphQL API to mark as read (updates write DB)
     const mutation = `
       mutation {
         markNotificationAsRead(id: "${id}") {
@@ -91,7 +87,6 @@ export class NotificationsService {
         throw new Error(response.data.errors[0].message);
       }
 
-      // Wait a bit for replication to sync, then refresh from read DB
       await new Promise((resolve) => setTimeout(resolve, 500));
 
       return (
@@ -100,15 +95,11 @@ export class NotificationsService {
         })) || notification
       );
     } catch (error) {
-      console.error(
-        `Failed to mark notification as read via Laravel: ${error}`,
-      );
       throw new NotFoundException(`Failed to mark notification as read`);
     }
   }
 
   async markAllAsRead(): Promise<{ message: string; count: number }> {
-    // Call Laravel GraphQL API to mark all as read (updates write DB)
     const mutation = `
       mutation {
         markAllNotificationsAsRead {
@@ -131,7 +122,6 @@ export class NotificationsService {
 
       const result = response.data.data.markAllNotificationsAsRead;
 
-      // Wait a bit for replication to sync
       await new Promise((resolve) => setTimeout(resolve, 500));
 
       return {
@@ -139,9 +129,6 @@ export class NotificationsService {
         count: result.count,
       };
     } catch (error) {
-      console.error(
-        `Failed to mark all notifications as read via Laravel: ${error}`,
-      );
       throw new Error(`Failed to mark all notifications as read`);
     }
   }

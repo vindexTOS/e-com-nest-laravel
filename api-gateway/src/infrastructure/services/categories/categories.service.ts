@@ -107,7 +107,6 @@ export class CategoriesService {
     const categoryMap = new Map<string, Category>();
     const roots: Category[] = [];
 
-    // First pass: create map
     categories.forEach((category) => {
       categoryMap.set(category.id, { ...category, children: [] });
     });
