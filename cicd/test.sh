@@ -16,8 +16,8 @@ if [ ! -d "node_modules" ]; then
     npm install
 fi
 
-echo "🔍 Running linter..."
-npm run lint > /dev/null 2>&1 || true
+# echo "🔍 Running linter..."
+# npm run lint > /dev/null 2>&1 || true
 
 echo "🧪 Running service unit tests..."
 

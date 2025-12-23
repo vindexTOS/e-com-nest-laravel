@@ -67,9 +67,9 @@ jobs:
         working-directory: ./api-gateway
         run: npm ci
 
-      - name: Run linter
-        working-directory: ./api-gateway
-        run: npm run lint || true
+      # - name: Run linter
+      #   working-directory: ./api-gateway
+      #   run: npm run lint || true
 
       - name: Run unit tests
         working-directory: ./api-gateway
