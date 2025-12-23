@@ -46,11 +46,6 @@ echo "🗄️  Running migrations..."
 docker-compose exec -T api-gateway npm run migration:run || true
 docker-compose exec -T admin-service php artisan migrate --force || true
 
-
-echo "🧹 Cleaning up unused Docker resources..."
-docker system prune -f
-
-
 echo "📊 Container status:"
 docker-compose ps
 
