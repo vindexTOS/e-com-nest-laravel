@@ -7,11 +7,18 @@ import { UsersGateway } from './websockets/users.gateway';
 import { JwtAuthGuard } from './libs/guards/jwt-auth.guard';
 import { RolesGuard } from './libs/guards/roles.guard';
 import { JwtWsGuard } from './libs/guards/jwt-ws.guard';
+import { UsersModule } from './services/users/users.module';
+import { OrdersModule } from './services/orders/orders.module';
+import { NotificationsModule } from './services/notifications/notifications.module';
 
 @Module({
-  imports: [TypeOrmModule.forFeature([User])],
+  imports: [
+    TypeOrmModule.forFeature([User]),
+    UsersModule,
+    OrdersModule,
+    NotificationsModule,
+  ],
   providers: [
-    UsersService,
     UsersGateway,
     JwtWsGuard,
     {
@@ -23,7 +30,7 @@ import { JwtWsGuard } from './libs/guards/jwt-ws.guard';
       useClass: RolesGuard,
     },
   ],
-  exports: [UsersService, UsersGateway],
+  exports: [UsersGateway],
 })
 export class InfrastructureModule {}
 
