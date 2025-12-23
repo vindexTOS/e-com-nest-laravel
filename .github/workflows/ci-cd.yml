@@ -106,14 +106,6 @@ jobs:
     if: github.event_name == 'push' && (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master')
     
     steps:
-      - name: Check if deployment secrets are configured
-        run: |
-          if [ -z "${{ secrets.DEPLOY_HOST }}" ] || [ -z "${{ secrets.DEPLOY_USER }}" ] || [ -z "${{ secrets.DEPLOY_SSH_KEY }}" ]; then
-            echo "⚠️  Deployment secrets not configured. Skipping deployment."
-            echo "Please configure DEPLOY_HOST, DEPLOY_USER, and DEPLOY_SSH_KEY in repository secrets."
-            exit 0
-          fi
-
       - name: Deploy to server via SSH
         if: secrets.DEPLOY_HOST != '' && secrets.DEPLOY_USER != '' && secrets.DEPLOY_SSH_KEY != ''
         uses: appleboy/ssh-action@v1.0.3
