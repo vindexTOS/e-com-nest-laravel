@@ -21,6 +21,7 @@ import UserLogin from './user/pages/UserLogin';
 import UserRegister from './user/pages/UserRegister';
 import UserProductsPage from './user/pages/UserProductPage';
 import UserOrdersPage from './user/pages/UserOrdersPage';
+import CheckoutPage from './user/pages/CheckoutPage';
 
 import '../css/app.css';
 
@@ -62,6 +63,14 @@ const App: React.FC = () => {
                         <Route
                             path="/orders"
                             element={<UserOrdersPage />}
+                        />
+                        <Route
+                            path="/checkout"
+                            element={
+                                <ProtectedRoute redirectTo="/login">
+                                    <CheckoutPage />
+                                </ProtectedRoute>
+                            }
                         />
 
                         {/* Admin Routes */}

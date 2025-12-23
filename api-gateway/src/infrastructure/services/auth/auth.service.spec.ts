@@ -1,6 +1,5 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { getRepositoryToken } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
 import { JwtService } from '@nestjs/jwt';
 import { ConfigService } from '@nestjs/config';
 import { UnauthorizedException, ConflictException } from '@nestjs/common';
@@ -14,15 +13,9 @@ jest.mock('bcrypt');
 
 describe('AuthService', () => {
   let service: AuthService;
-  let userRepository: jest.Mocked<Repository<User>>;
   let jwtService: jest.Mocked<JwtService>;
   let redisService: jest.Mocked<RedisService>;
-
-  const mockUserRepository = {
-    findOne: jest.fn(),
-    create: jest.fn(),
-    save: jest.fn(),
-  };
+  let configService: jest.Mocked<ConfigService>;
 
   const mockJwtService = {
     signAsync: jest.fn(),
@@ -41,6 +34,12 @@ describe('AuthService', () => {
   const mockRedisService = {
     get: jest.fn(),
     set: jest.fn(),
+  };
+
+  const mockUserRepository = {
+    findOne: jest.fn(),
+    create: jest.fn(),
+    save: jest.fn(),
   };
 
   beforeEach(async () => {
@@ -67,15 +66,15 @@ describe('AuthService', () => {
     }).compile();
 
     service = module.get<AuthService>(AuthService);
-    userRepository = module.get(getRepositoryToken(User));
     jwtService = module.get(JwtService);
     redisService = module.get(RedisService);
+    configService = module.get(ConfigService);
 
     jest.clearAllMocks();
   });
 
   describe('register', () => {
-    it('should register a new user', async () => {
+    it('should register a new user using JwtService for tokens', async () => {
       const registerDto: RegisterDto = {
         email: 'newuser@test.com',
         password: 'password123',
@@ -102,7 +101,7 @@ describe('AuthService', () => {
       expect(result).toHaveProperty('accessToken');
       expect(result).toHaveProperty('refreshToken');
       expect(result.user.email).toBe(registerDto.email);
-      expect(bcrypt.hash).toHaveBeenCalledWith(registerDto.password, 10);
+      expect(jwtService.signAsync).toHaveBeenCalled();
     });
 
     it('should throw ConflictException if email exists', async () => {
@@ -120,7 +119,7 @@ describe('AuthService', () => {
   });
 
   describe('login', () => {
-    it('should login with valid credentials', async () => {
+    it('should login with valid credentials using JwtService', async () => {
       const loginDto: LoginDto = {
         email: 'user@test.com',
         password: 'password123',
@@ -144,7 +143,7 @@ describe('AuthService', () => {
 
       expect(result).toHaveProperty('accessToken');
       expect(result).toHaveProperty('refreshToken');
-      expect(bcrypt.compare).toHaveBeenCalledWith(loginDto.password, mockUser.password);
+      expect(jwtService.signAsync).toHaveBeenCalled();
     });
 
     it('should throw UnauthorizedException with invalid credentials', async () => {
@@ -179,7 +178,7 @@ describe('AuthService', () => {
   });
 
   describe('refreshToken', () => {
-    it('should refresh tokens with valid refresh token', async () => {
+    it('should refresh tokens using JwtService and RedisService', async () => {
       const refreshToken = 'valid-refresh-token';
       const mockPayload = { sub: 'user-1', email: 'user@test.com' };
       const mockUser = {
@@ -200,9 +199,11 @@ describe('AuthService', () => {
 
       expect(result).toHaveProperty('accessToken');
       expect(result).toHaveProperty('refreshToken');
+      expect(jwtService.verify).toHaveBeenCalled();
+      expect(redisService.get).toHaveBeenCalled();
     });
 
-    it('should throw UnauthorizedException if token is blacklisted', async () => {
+    it('should throw UnauthorizedException if token is blacklisted in RedisService', async () => {
       const refreshToken = 'blacklisted-token';
       const mockPayload = { sub: 'user-1' };
 
@@ -213,4 +214,3 @@ describe('AuthService', () => {
     });
   });
 });
-

@@ -8,6 +8,7 @@ import {
   StreamableFile,
   Header,
 } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
 import { Public } from '../../../infrastructure/libs/decorators/public.decorator';
 import { ApiController } from '../../../infrastructure/libs/swagger/api-docs.decorator';
 import { ApiOperation, ApiResponse } from '@nestjs/swagger';
@@ -18,9 +19,14 @@ import { Readable } from 'stream';
 @ApiController('Storage')
 @Controller('storage')
 export class StorageController {
-  private readonly laravelUrl = process.env.LARAVEL_URL || 'http://admin-service';
+  private readonly laravelUrl: string;
 
-  constructor(private readonly httpService: HttpService) {}
+  constructor(
+    private readonly httpService: HttpService,
+    private readonly configService: ConfigService,
+  ) {
+    this.laravelUrl = this.configService.get<string>('LARAVEL_URL', 'http://admin-service');
+  }
 
   @Public()
   @Get('images/:path(*)')

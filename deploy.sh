@@ -1,0 +1,51 @@
+#!/bin/bash
+
+ 
+
+set -e
+
+echo "🚀 Starting deployment..."
+
+
+cd "$(dirname "$0")"
+
+
+if [ "$SKIP_GIT_PULL" != "true" ]; then
+    echo "🔄 Fetching latest code..."
+    git fetch origin
+    
+    echo "📥 Pulling latest changes..."
+    git reset --hard origin/main || git reset --hard origin/master
+fi
+
+
+echo "🛑 Stopping existing containers..."
+docker-compose down || true
+
+
+echo "🔨 Building Docker images..."
+docker-compose build --no-cache
+
+
+echo "▶️  Starting services..."
+docker-compose up -d
+
+
+echo "⏳ Waiting for services to be ready..."
+sleep 10
+
+
+echo "🗄️  Running migrations..."
+docker-compose exec -T api-gateway npm run migration:run || true
+docker-compose exec -T admin-service php artisan migrate --force || true
+
+
+echo "🧹 Cleaning up unused Docker resources..."
+docker system prune -f
+
+
+echo "📊 Container status:"
+docker-compose ps
+
+echo "✅ Deployment completed successfully!"
+

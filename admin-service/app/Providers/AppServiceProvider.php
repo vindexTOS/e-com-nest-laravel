@@ -17,6 +17,7 @@ use App\Observers\OrderObserver;
 use App\Observers\OrderItemObserver;
 use App\Observers\NotificationObserver;
 use Database\Seeders\AdminSeeder;
+use Database\Seeders\DefaultUserSeeder;
 use Database\Seeders\CategorySeeder;
 use App\Services\AuthTokenService;
 
@@ -41,6 +42,7 @@ class AppServiceProvider extends ServiceProvider
         $this->registerObservers();
         $this->registerJwtGuard();
         $this->ensureAdminExists();
+        $this->ensureDefaultUserExists();
         $this->ensureDefaultCategories();
     }
 
@@ -71,6 +73,22 @@ class AppServiceProvider extends ServiceProvider
             }
         } catch (\Exception $e) {
             \Log::warning('Admin seeding failed: ' . $e->getMessage());
+        }
+    }
+
+    private function ensureDefaultUserExists(): void
+    {
+        try {
+            $userEmail = 'user@gmail.com';
+            
+            $userExists = User::where('email', $userEmail)->exists();
+            
+            if (! $userExists) {
+                $seeder = new DefaultUserSeeder();
+                $seeder->run();
+            }
+        } catch (\Exception $e) {
+            \Log::warning('Default user seeding failed: ' . $e->getMessage());
         }
     }
 

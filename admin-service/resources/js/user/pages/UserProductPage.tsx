@@ -1,11 +1,12 @@
 import React, { useEffect, useState } from 'react';
-import { Layout, Typography, Button, Card, Row, Col, Empty, message, Spin, Tag, Table, Input, Select, Pagination, Modal, Form, InputNumber } from 'antd';
-import { ShoppingOutlined, UserOutlined, LoginOutlined, SearchOutlined, WalletOutlined, PlusOutlined, CreditCardOutlined } from '@ant-design/icons';
+import { Layout, Typography, Button, Card, Row, Col, Empty, message, Spin, Tag, Table, Input, Select, Pagination } from 'antd';
+import { ShoppingOutlined, UserOutlined, LoginOutlined, SearchOutlined, WalletOutlined } from '@ant-design/icons';
 import { useAuth } from '../../shared/hooks/useAuth';
 import { useNavigate, Link } from 'react-router-dom';
 import axios from 'axios';
-import { categoriesGql, balanceGql } from '../../graphql';
+import { categoriesGql } from '../../graphql';
 import { nestjsOrdersApi } from '../../api';
+import { paymentApi } from '../../api/nestjs/payment.api';
 import { getImageUrl } from '../../shared/utils/imageUtils';
 
 const { Header, Content } = Layout;
@@ -29,9 +30,6 @@ const UserProductsPage: React.FC = () => {
     // Balance state
     const [balance, setBalance] = useState<number>(0);
     const [balanceLoading, setBalanceLoading] = useState(false);
-    const [addBalanceModalVisible, setAddBalanceModalVisible] = useState(false);
-    const [addingBalance, setAddingBalance] = useState(false);
-    const [balanceForm] = Form.useForm();
     
     // Filters and pagination
     const [search, setSearch] = useState('');
@@ -56,7 +54,7 @@ const UserProductsPage: React.FC = () => {
         if (!isAuthenticated) return;
         setBalanceLoading(true);
         try {
-            const res = await balanceGql.getBalance();
+            const res = await paymentApi.getBalance();
             setBalance(res.balance);
         } catch (err) {
             console.error('Failed to load balance');
@@ -80,18 +78,25 @@ const UserProductsPage: React.FC = () => {
             const params: any = { 
                 limit, 
                 page,
-                status: 'active',
+                // Only filter by active status if we want to show only active products
+                // Remove status filter to show all products (like admin side)
+                // status: 'active',
             };
             if (searchTerm) params.search = searchTerm;
-            if (catId) params.category_id = catId;
+            if (catId) params.categoryId = catId;
             
             const res = await axios.get('/api/gateway/products', { params });
             const body = res.data;
+            
+            // Handle response structure: { data: [...], total: X, page: 1, limit: 12 }
             const list = Array.isArray(body?.data) ? body.data : Array.isArray(body) ? body : [];
+            const totalCount = body?.total ?? (Array.isArray(body) ? body.length : 0);
+            
             setProducts(list);
-            setTotal(body?.total || 0);
-        } catch (err) {
-            message.error('Failed to load products');
+            setTotal(totalCount);
+        } catch (err: any) {
+            console.error('Failed to load products:', err);
+            message.error(err?.response?.data?.message || 'Failed to load products');
         } finally {
             setProductsLoading(false);
         }
@@ -111,58 +116,35 @@ const UserProductsPage: React.FC = () => {
         }
     };
 
-    const handleOrder = async (productId: string, productPrice: number) => {
+    const handleOrder = async (productId: string) => {
         if (!isAuthenticated || !user) {
             message.warning('Please login to order');
             return;
         }
         
-        // Estimate total (price + 10% tax + $10 shipping)
-        const estimatedTotal = productPrice * 1.1 + 10;
-        
-        if (balance < estimatedTotal) {
-            message.error(`Insufficient balance. You need ~$${estimatedTotal.toFixed(2)} but have $${balance.toFixed(2)}. Please add funds.`);
-            setAddBalanceModalVisible(true);
+        // Find the product to pass to checkout
+        const product = products.find(p => p.id === productId);
+        if (!product) {
+            message.error('Product not found');
             return;
         }
         
-        try {
-            await nestjsOrdersApi.create({
-                items: [{ productId: productId, quantity: 1 }],
-            });
-            message.success('Order placed successfully!');
-            loadOrders();
-            loadBalance(); // Refresh balance after order
-        } catch (err: any) {
-            const errorMsg = err?.message || err?.response?.data?.message || 'Order failed';
-            if (errorMsg.includes('balance') || errorMsg.includes('Balance')) {
-                message.error(errorMsg);
-                setAddBalanceModalVisible(true);
-            } else {
-                message.error(errorMsg);
-            }
-        }
+        // Redirect to checkout page with product info (order will be created after payment)
+        // Ensure price is a number
+        navigate('/checkout', { 
+            state: { 
+                product: {
+                    id: product.id,
+                    name: product.name,
+                    price: Number(product.price) || 0,
+                    image: product.image,
+                    sku: product.sku,
+                },
+                quantity: 1
+            } 
+        });
     };
 
-    const handleAddBalance = async (values: any) => {
-        setAddingBalance(true);
-        try {
-            const res = await balanceGql.addBalance({
-                amount: values.amount,
-                card_number: values.card_number,
-                card_expiry: values.card_expiry,
-                card_cvv: values.card_cvv,
-            });
-            message.success(res.message);
-            setBalance(res.balance);
-            setAddBalanceModalVisible(false);
-            balanceForm.resetFields();
-        } catch (err: any) {
-            message.error(err?.message || 'Failed to add balance');
-        } finally {
-            setAddingBalance(false);
-        }
-    };
 
     const handleSearch = () => {
         setCurrentPage(1);
@@ -245,15 +227,6 @@ const UserProductsPage: React.FC = () => {
                                 <Text strong style={{ color: '#52c41a' }}>
                                     {balanceLoading ? '...' : `$${balance.toFixed(2)}`}
                                 </Text>
-                                <Button 
-                                    type="link" 
-                                    size="small" 
-                                    icon={<PlusOutlined />}
-                                    onClick={() => setAddBalanceModalVisible(true)}
-                                    style={{ padding: 0 }}
-                                >
-                                    Add
-                                </Button>
                             </div>
                             <Link to="/orders">
                                 <Button type="default" icon={<ShoppingOutlined />}>
@@ -345,8 +318,6 @@ const UserProductsPage: React.FC = () => {
                         <Row gutter={[16, 16]}>
                                 {products.map((p) => {
                                     const price = Number(p.price ?? 0);
-                                    const estimatedTotal = price * 1.1 + 10;
-                                    const canAfford = balance >= estimatedTotal;
                                     
                                     return (
                                 <Col key={p.id} xs={24} sm={12} lg={8} xl={6}>
@@ -395,23 +366,14 @@ const UserProductsPage: React.FC = () => {
                                                         <Button block style={{ marginTop: 12 }} disabled>
                                                             Out of Stock
                                                         </Button>
-                                                    ) : !canAfford ? (
-                                                        <Button 
-                                                            block 
-                                                            style={{ marginTop: 12 }} 
-                                                            type="default"
-                                                            onClick={() => setAddBalanceModalVisible(true)}
-                                                        >
-                                                            Add Funds (~${estimatedTotal.toFixed(0)} needed)
-                                                        </Button>
                                                     ) : (
                                                         <Button 
                                                             block 
                                                             style={{ marginTop: 12 }} 
                                                             type="primary" 
-                                                            onClick={() => handleOrder(p.id, price)}
+                                                            onClick={() => handleOrder(p.id)}
                                                         >
-                                                            Order Now
+                                                            Buy
                                                         </Button>
                                                     )
                                                 ) : (
@@ -514,118 +476,6 @@ const UserProductsPage: React.FC = () => {
                     </Card>
                 )}
             </Content>
-
-            {/* Add Balance Modal */}
-            <Modal
-                title={
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                        <CreditCardOutlined style={{ color: '#667eea' }} />
-                        <span>Add Funds to Wallet</span>
-                    </div>
-                }
-                open={addBalanceModalVisible}
-                onCancel={() => {
-                    setAddBalanceModalVisible(false);
-                    balanceForm.resetFields();
-                }}
-                footer={null}
-            >
-                <div style={{ marginBottom: 16, padding: 12, background: '#f6ffed', borderRadius: 8 }}>
-                    <Text>Current Balance: </Text>
-                    <Text strong style={{ fontSize: 18, color: '#52c41a' }}>${balance.toFixed(2)}</Text>
-                </div>
-                
-                <Form
-                    form={balanceForm}
-                    layout="vertical"
-                    onFinish={handleAddBalance}
-                    initialValues={{ amount: 100 }}
-                >
-                    <Form.Item
-                        name="amount"
-                        label="Amount to Add"
-                        rules={[
-                            { required: true, message: 'Please enter amount' },
-                            { type: 'number', min: 1, max: 10000, message: 'Amount must be between $1 and $10,000' }
-                        ]}
-                    >
-                        <InputNumber
-                            style={{ width: '100%' }}
-                            prefix="$"
-                            min={1}
-                            max={10000}
-                            placeholder="100.00"
-                        />
-                    </Form.Item>
-                    
-                    <Form.Item
-                        name="card_number"
-                        label="Card Number"
-                        rules={[
-                            { required: true, message: 'Please enter card number' },
-                            { pattern: /^[\d\s]{13,19}$/, message: 'Invalid card number' }
-                        ]}
-                    >
-                        <Input 
-                            placeholder="4242 4242 4242 4242" 
-                            maxLength={19}
-                        />
-                    </Form.Item>
-                    
-                    <Row gutter={16}>
-                        <Col span={12}>
-                            <Form.Item
-                                name="card_expiry"
-                                label="Expiry Date"
-                                rules={[
-                                    { required: true, message: 'Required' },
-                                    { pattern: /^\d{2}\/\d{2}$/, message: 'Use MM/YY format' }
-                                ]}
-                            >
-                                <Input placeholder="MM/YY" maxLength={5} />
-                            </Form.Item>
-                        </Col>
-                        <Col span={12}>
-                            <Form.Item
-                                name="card_cvv"
-                                label="CVV"
-                                rules={[
-                                    { required: true, message: 'Required' },
-                                    { pattern: /^\d{3,4}$/, message: '3-4 digits' }
-                                ]}
-                            >
-                                <Input placeholder="123" maxLength={4} type="password" />
-                            </Form.Item>
-                        </Col>
-                    </Row>
-                    
-                    <div style={{ 
-                        padding: 12, 
-                        background: '#fff7e6', 
-                        borderRadius: 8, 
-                        marginBottom: 16,
-                        border: '1px solid #ffd591'
-                    }}>
-                        <Text type="secondary" style={{ fontSize: 12 }}>
-                            🔒 This is a mock payment system for testing. No real charges will be made.
-                            Use any card number like 4242 4242 4242 4242.
-                        </Text>
-                    </div>
-                    
-                    <Form.Item style={{ marginBottom: 0 }}>
-                        <Button 
-                            type="primary" 
-                            htmlType="submit" 
-                            block 
-                            size="large"
-                            loading={addingBalance}
-                            icon={<WalletOutlined />}
-                        >
-                            Add Funds
-                        </Button>
-                    </Form.Item>
-                </Form>
-            </Modal>
         </Layout>
     );
 };

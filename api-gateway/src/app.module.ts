@@ -17,6 +17,7 @@ import { OrderController } from './application/controllers/order/order.controlle
 import { UserController } from './application/controllers/user/user.controller';
 import { StorageController } from './application/controllers/storage/storage.controller';
 import { NotificationController } from './application/controllers/notification/notification.controller';
+import { PaymentController } from './application/controllers/payment/payment.controller';
 import { UsersService } from './infrastructure/services/users/users.service';
 import { ProductsModule } from './infrastructure/services/products/products.module';
 import { CategoriesModule } from './infrastructure/services/categories/categories.module';
@@ -24,13 +25,16 @@ import { OrdersModule } from './infrastructure/services/orders/orders.module';
 import { NotificationsModule } from './infrastructure/services/notifications/notifications.module';
 import { EmailModule } from './infrastructure/services/email/email.module';
 import { EventsModule } from './infrastructure/events/events.module';
+import { QueueModule } from './infrastructure/queue/queue.module';
+import { PaymentModule } from './infrastructure/services/payment/payment.module';
 import { UsersGateway } from './infrastructure/websockets/users.gateway';
 
 @Module({
   imports: [
     ConfigModule.forRoot({
       isGlobal: true,
-      envFilePath: '.env',
+      envFilePath: ['.env', '../.env'],
+      expandVariables: true,
     }),
     HttpModule,
     DatabaseModule,
@@ -44,9 +48,11 @@ import { UsersGateway } from './infrastructure/websockets/users.gateway';
     OrdersModule,
     NotificationsModule,
     EmailModule,
+    QueueModule,
+    PaymentModule,
     EventsModule,
   ],
-  controllers: [ProductController, OrderController, UserController, StorageController, NotificationController],
+  controllers: [ProductController, OrderController, UserController, StorageController, NotificationController, PaymentController],
   providers: [
     UsersService,
     UsersGateway,

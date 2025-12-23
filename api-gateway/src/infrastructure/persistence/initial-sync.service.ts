@@ -252,9 +252,11 @@ export class InitialSyncService implements OnModuleInit {
   private async invalidateProductCache(): Promise<void> {
     try {
       const Redis = require('ioredis');
+      const redisHost = process.env.REDIS_HOST || 'redis';
+      const redisPort = parseInt(process.env.REDIS_PORT || '6379', 10);
       const cacheClient = new Redis({
-        host: process.env.REDIS_HOST || 'redis',
-        port: parseInt(process.env.REDIS_PORT || '6379', 10),
+        host: redisHost,
+        port: redisPort,
       });
       await cacheClient.setex('products:cache:version', 60 * 60 * 24 * 365 * 10, Date.now().toString());
       await cacheClient.quit();

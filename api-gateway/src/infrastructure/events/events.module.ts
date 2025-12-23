@@ -1,10 +1,10 @@
 import { Module } from '@nestjs/common';
 import { OrderEventsController } from './order-events.controller';
-import { EmailModule } from '../services/email/email.module';
+import { QueueModule } from '../queue/queue.module';
 
 @Module({
   imports: [
-    EmailModule,
+    QueueModule,
   ],
   controllers: [
     OrderEventsController,

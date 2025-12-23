@@ -1,7 +1,8 @@
 import { Controller, Logger, OnModuleInit, OnModuleDestroy } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import { EmailService, OrderConfirmationEmailData } from '../services/email/email.service';
 import Redis from 'ioredis';
+import { QueueService } from '../queue/queue.service';
+import type { SendOrderEmailJobData } from '../../domain/dto/queue/send-order-email-job.dto';
 
 @Controller()
 export class OrderEventsController implements OnModuleInit, OnModuleDestroy {
@@ -10,7 +11,7 @@ export class OrderEventsController implements OnModuleInit, OnModuleDestroy {
   private subscriber: Redis;
 
   constructor(
-    private readonly emailService: EmailService,
+    private readonly queueService: QueueService,
     private readonly configService: ConfigService,
   ) {}
 
@@ -99,14 +100,14 @@ export class OrderEventsController implements OnModuleInit, OnModuleDestroy {
     
     this.logger.log(`✅ Order event has required data - email: ${userEmail}, order_number: ${orderNumber}`);
 
-    await this.sendOrderConfirmationEmail(orderData).catch(err => {
-      this.logger.error(`Failed to send order confirmation email: ${err.message}`);
+    await this.addOrderConfirmationEmailToQueue(orderData).catch(err => {
+      this.logger.error(`Failed to add order confirmation email to queue: ${err.message}`);
     });
     
     this.logger.log(`Order event processed successfully for order: ${orderData.order_number}`);
   }
 
-  private async sendOrderConfirmationEmail(orderData: any): Promise<void> {
+  private async addOrderConfirmationEmailToQueue(orderData: any): Promise<void> {
     const items = (orderData.items || []).map((item: any) => ({
       name: item.product_name || item.product?.name || item.name || 'Product',
       quantity: item.quantity || 1,
@@ -120,10 +121,11 @@ export class OrderEventsController implements OnModuleInit, OnModuleDestroy {
       user.name ||
       'Customer';
 
-    const emailData: OrderConfirmationEmailData = {
-      customerName,
-      customerEmail: orderData.user_email || user.email,
+    const jobData: SendOrderEmailJobData = {
+      orderId: orderData.id,
       orderNumber: orderData.order_number,
+      customerEmail: orderData.user_email || user.email,
+      customerName,
       orderDate: orderData.created_at 
         ? new Date(orderData.created_at).toLocaleString('en-US', {
             weekday: 'long',
@@ -144,9 +146,9 @@ export class OrderEventsController implements OnModuleInit, OnModuleDestroy {
       billingAddress: orderData.billing_address,
     };
 
-    this.logger.log(`📧 Attempting to send order confirmation email to: ${emailData.customerEmail}`);
-    await this.emailService.sendOrderConfirmation(emailData);
-    this.logger.log(`✅ Order confirmation email sent successfully to ${emailData.customerEmail}`);
+    this.logger.log(`📧 Adding order confirmation email job to queue for: ${jobData.customerEmail}`);
+    await this.queueService.addOrderConfirmationEmailJob(jobData);
+    this.logger.log(`✅ Order confirmation email job added to queue for order ${jobData.orderNumber}`);
   }
 
 }

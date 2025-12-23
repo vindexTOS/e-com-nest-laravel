@@ -29,8 +29,7 @@ export class UsersGateway implements OnGatewayConnection {
     private readonly notificationsService: NotificationsService,
     private readonly notificationEventsService: NotificationEventsService,
   ) {
-    // Set up the broadcast callback for real-time notifications
-    this.notificationEventsService.setBroadcastCallback((notification) => {
+     this.notificationEventsService.setBroadcastCallback((notification) => {
       this.broadcastNotification(notification);
     });
   }
@@ -165,8 +164,7 @@ export class UsersGateway implements OnGatewayConnection {
     this.server.emit('orders:updated', order);
   }
 
-  // Notification handlers
-  @SubscribeMessage('notifications:get')
+   @SubscribeMessage('notifications:get')
   async handleNotificationsGet(
     @ConnectedSocket() client: Socket,
     @MessageBody()
@@ -224,8 +222,7 @@ export class UsersGateway implements OnGatewayConnection {
     }
   }
 
-  // Broadcast new notification to all connected clients
-  broadcastNotification(notification: any) {
+   broadcastNotification(notification: any) {
     this.server.emit('notifications:new', notification);
   }
 }

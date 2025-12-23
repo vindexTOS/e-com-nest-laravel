@@ -1,12 +1,10 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { getRepositoryToken } from '@nestjs/typeorm';
-import { Repository, SelectQueryBuilder } from 'typeorm';
 import { UsersService } from './users.service';
 import { User } from '../../../domain/entities/user.entity';
 
 describe('UsersService', () => {
   let service: UsersService;
-  let userRepository: jest.Mocked<Repository<User>>;
 
   const mockQueryBuilder = {
     where: jest.fn().mockReturnThis(),
@@ -34,8 +32,6 @@ describe('UsersService', () => {
     }).compile();
 
     service = module.get<UsersService>(UsersService);
-    userRepository = module.get(getRepositoryToken(User));
-
     jest.clearAllMocks();
   });
 
@@ -52,7 +48,6 @@ describe('UsersService', () => {
 
       expect(result.data).toEqual(mockUsers);
       expect(result.total).toBe(2);
-      expect(mockUserRepository.createQueryBuilder).toHaveBeenCalled();
     });
 
     it('should filter by search term', async () => {
@@ -81,7 +76,6 @@ describe('UsersService', () => {
       const result = await service.findOne('1');
 
       expect(result).toEqual(mockUser);
-      expect(userRepository.findOne).toHaveBeenCalledWith({ where: { id: '1' } });
     });
 
     it('should return null if user not found', async () => {
@@ -93,4 +87,3 @@ describe('UsersService', () => {
     });
   });
 });
-

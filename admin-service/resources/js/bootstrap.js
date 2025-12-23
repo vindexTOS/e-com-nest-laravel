@@ -9,12 +9,12 @@ window.Pusher = Pusher;
 
 window.Echo = new Echo({
     broadcaster: 'pusher',
-    key: import.meta.env.VITE_PUSHER_APP_KEY || 'ecom-key',
-    wsHost: import.meta.env.VITE_PUSHER_HOST || window.location.hostname,
-    wsPort: import.meta.env.VITE_PUSHER_PORT || 6001,
-    wssPort: import.meta.env.VITE_PUSHER_PORT || 6001,
+    key: import.meta.env.VITE_PUSHER_APP_KEY || import.meta.env.PUSHER_APP_KEY || 'ecom-key',
+    wsHost: import.meta.env.VITE_PUSHER_HOST || import.meta.env.PUSHER_HOST || window.location.hostname || 'localhost',
+    wsPort: Number(import.meta.env.VITE_PUSHER_PORT || import.meta.env.PUSHER_PORT || '6001'),
+    wssPort: Number(import.meta.env.VITE_PUSHER_PORT || import.meta.env.PUSHER_PORT || '6001'),
     forceTLS: false,
     disableStats: true,
     enabledTransports: ['ws', 'wss'],
-    cluster: import.meta.env.VITE_PUSHER_APP_CLUSTER || 'mt1',
+    cluster: import.meta.env.VITE_PUSHER_APP_CLUSTER || import.meta.env.PUSHER_APP_CLUSTER || 'mt1',
 });

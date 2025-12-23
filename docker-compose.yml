@@ -28,28 +28,28 @@ services:
       # Write Database (for writes)
       - DATABASE_WRITE_HOST=${DB_WRITE_HOST:-postgres-write}
       - DATABASE_WRITE_PORT=${DB_PORT:-5432}
-      - DATABASE_WRITE_USER=${DB_USER}
-      - DATABASE_WRITE_PASSWORD=${DB_PASSWORD}
-      - DATABASE_WRITE_NAME=${DB_NAME_WRITE}
+      - DATABASE_WRITE_USER=${DB_USER:-ecom_user}
+      - DATABASE_WRITE_PASSWORD=${DB_PASSWORD:-ecom_password}
+      - DATABASE_WRITE_NAME=${DB_NAME_WRITE:-ecom_db_write}
       # Read Database (for reads)
       - DATABASE_READ_HOST=${DB_READ_HOST:-postgres-read}
       - DATABASE_READ_PORT=${DB_PORT:-5432}
-      - DATABASE_READ_USER=${DB_USER}
-      - DATABASE_READ_PASSWORD=${DB_PASSWORD}
-      - DATABASE_READ_NAME=${DB_NAME_READ}
+      - DATABASE_READ_USER=${DB_USER:-ecom_user}
+      - DATABASE_READ_PASSWORD=${DB_PASSWORD:-ecom_password}
+      - DATABASE_READ_NAME=${DB_NAME_READ:-ecom_db_read}
       # Legacy support (defaults to write)
       - DATABASE_HOST=${DB_WRITE_HOST:-postgres-write}
       - DATABASE_PORT=${DB_PORT:-5432}
-      - DATABASE_USER=${DB_USER}
-      - DATABASE_PASSWORD=${DB_PASSWORD}
-      - DATABASE_NAME=${DB_NAME_WRITE}
+      - DATABASE_USER=${DB_USER:-ecom_user}
+      - DATABASE_PASSWORD=${DB_PASSWORD:-ecom_password}
+      - DATABASE_NAME=${DB_NAME_WRITE:-ecom_db_write}
       # Redis
       - REDIS_HOST=${REDIS_HOST:-redis}
       - REDIS_PORT=${REDIS_PORT:-6379}
       # Elasticsearch
       - ELASTICSEARCH_NODE=${ELASTICSEARCH_NODE:-http://elasticsearch:9200}
       # JWT
-      - JWT_SECRET=${JWT_SECRET}
+      - JWT_SECRET=${JWT_SECRET:-test-secret-key-for-development-only-change-in-production}
       - JWT_EXPIRATION=${JWT_EXPIRATION:-7d}
       # Email
       - EMAIL_USER=${EMAIL_USER:-g.kutateli@gmail.com}
@@ -81,9 +81,9 @@ services:
     ports:
       - "5432:5432"
     environment:
-      - POSTGRES_USER=${DB_USER}
-      - POSTGRES_PASSWORD=${DB_PASSWORD}
-      - POSTGRES_DB=${DB_NAME_WRITE}
+      - POSTGRES_USER=${DB_USER:-ecom_user}
+      - POSTGRES_PASSWORD=${DB_PASSWORD:-ecom_password}
+      - POSTGRES_DB=${DB_NAME_WRITE:-ecom_db_write}
     volumes:
       - postgres_write_data:/var/lib/postgresql/data
     command:
@@ -93,7 +93,7 @@ services:
       - "-c"
       - "shared_preload_libraries=pg_stat_statements"
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U ${DB_USER} -d ${DB_NAME_WRITE}"]
+      test: ["CMD-SHELL", "pg_isready -U ${DB_USER:-ecom_user} -d ${DB_NAME_WRITE:-ecom_db_write}"]
       interval: 10s
       timeout: 5s
       retries: 5
@@ -107,9 +107,9 @@ services:
     ports:
       - "5433:5432"
     environment:
-      - POSTGRES_USER=${DB_USER}
-      - POSTGRES_PASSWORD=${DB_PASSWORD}
-      - POSTGRES_DB=${DB_NAME_READ}
+      - POSTGRES_USER=${DB_USER:-ecom_user}
+      - POSTGRES_PASSWORD=${DB_PASSWORD:-ecom_password}
+      - POSTGRES_DB=${DB_NAME_READ:-ecom_db_read}
     volumes:
       - postgres_read_data:/var/lib/postgresql/data
     command:
@@ -117,7 +117,7 @@ services:
       - "-c"
       - "max_connections=200"
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U ${DB_USER} -d ${DB_NAME_READ}"]
+      test: ["CMD-SHELL", "pg_isready -U ${DB_USER:-ecom_user} -d ${DB_NAME_READ:-ecom_db_read}"]
       interval: 10s
       timeout: 5s
       retries: 5
@@ -143,29 +143,29 @@ services:
       - APP_NAME=${APP_NAME:-EcomAdmin}
       - APP_ENV=${APP_ENV:-production}
       - APP_DEBUG=${APP_DEBUG:-false}
-      - APP_KEY=${APP_KEY}
+      - APP_KEY=${APP_KEY:-base64:test-key-for-development-only}
       - APP_URL=${APP_URL:-http://localhost}
       # Write Database (for writes)
       - DB_WRITE_CONNECTION=pgsql
       - DB_WRITE_HOST=${DB_WRITE_HOST:-postgres-write}
       - DB_WRITE_PORT=${DB_PORT:-5432}
-      - DB_WRITE_DATABASE=${DB_NAME_WRITE}
-      - DB_WRITE_USERNAME=${DB_USER}
-      - DB_WRITE_PASSWORD=${DB_PASSWORD}
+      - DB_WRITE_DATABASE=${DB_NAME_WRITE:-ecom_db_write}
+      - DB_WRITE_USERNAME=${DB_USER:-ecom_user}
+      - DB_WRITE_PASSWORD=${DB_PASSWORD:-ecom_password}
       # Read Database (for reads)
       - DB_READ_CONNECTION=pgsql
       - DB_READ_HOST=${DB_READ_HOST:-postgres-read}
       - DB_READ_PORT=${DB_PORT:-5432}
-      - DB_READ_DATABASE=${DB_NAME_READ}
-      - DB_READ_USERNAME=${DB_USER}
-      - DB_READ_PASSWORD=${DB_PASSWORD}
+      - DB_READ_DATABASE=${DB_NAME_READ:-ecom_db_read}
+      - DB_READ_USERNAME=${DB_USER:-ecom_user}
+      - DB_READ_PASSWORD=${DB_PASSWORD:-ecom_password}
       # Legacy support (defaults to write)
       - DB_CONNECTION=pgsql
       - DB_HOST=${DB_WRITE_HOST:-postgres-write}
       - DB_PORT=${DB_PORT:-5432}
-      - DB_DATABASE=${DB_NAME_WRITE}
-      - DB_USERNAME=${DB_USER}
-      - DB_PASSWORD=${DB_PASSWORD}
+      - DB_DATABASE=${DB_NAME_WRITE:-ecom_db_write}
+      - DB_USERNAME=${DB_USER:-ecom_user}
+      - DB_PASSWORD=${DB_PASSWORD:-ecom_password}
       # Redis
       - REDIS_HOST=${REDIS_HOST:-redis}
       - REDIS_PORT=${REDIS_PORT:-6379}
@@ -176,7 +176,7 @@ services:
       - QUEUE_CONNECTION=${QUEUE_CONNECTION:-redis}
       - SESSION_DRIVER=${SESSION_DRIVER:-file}
       # JWT
-      - JWT_SECRET=${JWT_SECRET}
+      - JWT_SECRET=${JWT_SECRET:-test-secret-key-for-development-only-change-in-production}
       - JWT_EXPIRATION=1h
       - JWT_REFRESH_EXPIRATION=${JWT_REFRESH_EXPIRATION:-7d}
       # Internal URLs

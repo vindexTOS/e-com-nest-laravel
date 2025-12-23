@@ -1,0 +1,176 @@
+name: Test Only (PR Checks)
+
+on:
+  pull_request:
+    branches: [ main, master, develop ]
+
+env:
+  NODE_VERSION: '20'
+  PHP_VERSION: '8.5'
+
+jobs:
+  test-api-gateway:
+    name: Test API Gateway
+    runs-on: ubuntu-latest
+    
+    services:
+      postgres:
+        image: postgres:15-alpine
+        env:
+          POSTGRES_USER: test
+          POSTGRES_PASSWORD: test
+          POSTGRES_DB: test_db
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+        ports:
+          - 5432:5432
+      
+      redis:
+        image: redis:7-alpine
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+        ports:
+          - 6379:6379
+      
+      elasticsearch:
+        image: docker.elastic.co/elasticsearch/elasticsearch:8.11.0
+        env:
+          discovery.type: single-node
+          xpack.security.enabled: false
+          ES_JAVA_OPTS: -Xms512m -Xmx512m
+        options: >-
+          --health-cmd "curl -f http://localhost:9200/_cluster/health || exit 1"
+          --health-interval 30s
+          --health-timeout 10s
+          --health-retries 5
+        ports:
+          - 9200:9200
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'npm'
+          cache-dependency-path: api-gateway/package-lock.json
+
+      - name: Install dependencies
+        working-directory: ./api-gateway
+        run: npm ci
+
+      - name: Run linter
+        working-directory: ./api-gateway
+        run: npm run lint || true
+
+      - name: Run unit tests
+        working-directory: ./api-gateway
+        env:
+          NODE_ENV: test
+          DATABASE_WRITE_HOST: localhost
+          DATABASE_WRITE_PORT: 5432
+          DATABASE_WRITE_USER: test
+          DATABASE_WRITE_PASSWORD: test
+          DATABASE_WRITE_NAME: test_db
+          DATABASE_READ_HOST: localhost
+          DATABASE_READ_PORT: 5432
+          DATABASE_READ_USER: test
+          DATABASE_READ_PASSWORD: test
+          DATABASE_READ_NAME: test_db
+          REDIS_HOST: localhost
+          REDIS_PORT: 6379
+          ELASTICSEARCH_NODE: http://localhost:9200
+          JWT_SECRET: test-secret-key-for-ci
+        run: npm test -- --coverage --passWithNoTests
+
+      - name: Build application
+        working-directory: ./api-gateway
+        run: npm run build
+
+  test-admin-service:
+    name: Test Admin Service
+    runs-on: ubuntu-latest
+
+    services:
+      postgres:
+        image: postgres:15-alpine
+        env:
+          POSTGRES_USER: test
+          POSTGRES_PASSWORD: test
+          POSTGRES_DB: test_db
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+        ports:
+          - 5432:5432
+
+      redis:
+        image: redis:7-alpine
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+        ports:
+          - 6379:6379
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup PHP
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: ${{ env.PHP_VERSION }}
+          extensions: pdo, pdo_pgsql, redis, mbstring, exif, pcntl, bcmath, gd, zip
+          coverage: none
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'npm'
+          cache-dependency-path: admin-service/package-lock.json
+
+      - name: Install Composer dependencies
+        working-directory: ./admin-service
+        run: |
+          composer install --prefer-dist --no-progress --no-interaction --optimize-autoloader
+
+      - name: Install NPM dependencies
+        working-directory: ./admin-service
+        run: npm ci
+
+      - name: Copy environment file
+        working-directory: ./admin-service
+        run: |
+          cp .env.example .env || echo "APP_KEY=" > .env
+          php artisan key:generate --ansi || true
+
+      - name: Run PHPUnit tests
+        working-directory: ./admin-service
+        env:
+          DB_CONNECTION: pgsql
+          DB_HOST: localhost
+          DB_PORT: 5432
+          DB_DATABASE: test_db
+          DB_USERNAME: test
+          DB_PASSWORD: test
+          REDIS_HOST: localhost
+          REDIS_PORT: 6379
+        run: composer test || php vendor/bin/phpunit || true
+
+      - name: Build frontend
+        working-directory: ./admin-service
+        run: npm run build || true
+

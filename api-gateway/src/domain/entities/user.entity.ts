@@ -37,6 +37,9 @@ export class User extends BaseEntity {
   @Column({ name: 'email_verified_at', type: 'timestamp', nullable: true })
   emailVerifiedAt: Date | null;
 
+  @Column({ type: 'decimal', precision: 10, scale: 2, default: 0 })
+  balance: number;
+
   @OneToMany(() => Order, (order) => order.user)
   orders: Order[];
 }
