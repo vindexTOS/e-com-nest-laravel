@@ -9,7 +9,7 @@ import {
   Inject,
 } from '@nestjs/common';
 import type { Request } from 'express';
-import { IAuthService } from '../../../domain/interfaces/services';
+import type { IAuthService } from '../../../domain/interfaces/services';
 import {
   RegisterDto,
   LoginDto,
