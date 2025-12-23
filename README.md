@@ -256,10 +256,9 @@ While Nginx handles routing, you can also access services directly:
 
 ### Admin Dashboard
 
-**Full URL**: http://localhost/
+**Full URL**: http://localhost/admin
 
 - React-based admin dashboard
-- Accessible at the root path
 - Requires admin authentication
 - Manage products, categories, orders, and users
 
@@ -269,7 +268,7 @@ While Nginx handles routing, you can also access services directly:
 
 ### User/Customer Pages
 
-**Full URL**: http://localhost/
+**Full URL**: http://localhost
 
 The same React frontend serves both admin and customer views based on user role and authentication:
 
@@ -277,14 +276,35 @@ The same React frontend serves both admin and customer views based on user role 
 - **Authenticated customers**: Customer dashboard, order history, profile management
 - **Authenticated admins**: Admin dashboard with full management capabilities
 
-The frontend automatically detects user role and displays the appropriate interface.
-
-### Default Admin Credentials
-
-- **Email**: `admin@gmail.com`
+**Default User Credentials:**
+- **Email**: `user@gmail.com`
 - **Password**: `1234567`
 
-The admin user is automatically created on first startup.
+The frontend automatically detects user role and displays the appropriate interface.
+
+### Seeding Products
+
+To seed sample products:
+
+1. Log in to the admin dashboard at http://localhost/admin
+2. Navigate to the **Products** page or **Dashboard**
+3. Click the **"Seed Products"** button
+4. Sample products will be generated automatically
+
+### Running Tests
+
+To run all NestJS service unit tests:
+
+```bash
+./cicd/test.sh
+```
+
+This script will:
+- Run the linter (with suppressed warnings)
+- Run all service unit tests individually
+- Display test results and coverage
+
+The admin and user accounts are automatically created on first startup.
 
 ## API Documentation
 
