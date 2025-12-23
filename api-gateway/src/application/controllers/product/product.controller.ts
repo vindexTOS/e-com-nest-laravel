@@ -55,17 +55,17 @@ export class ProductController {
     });
   }
 
-  @Public()
-  @Post('sync')
-  async sync() {
-    return this.productsService.syncToElasticsearch();
-  }
+  // @Public()
+  // @Post('sync')
+  // async sync() {
+  //   return this.productsService.syncToElasticsearch();
+  // }
 
-  @Public()
-  @Post('sync-from-write')
-  async syncFromWrite() {
-    return this.productsService.syncFromWriteDatabase();
-  }
+  // @Public()
+  // @Post('sync-from-write')
+  // async syncFromWrite() {
+  //   return this.productsService.syncFromWriteDatabase();
+  // }
 
   @Public()
   @Get(':id')
