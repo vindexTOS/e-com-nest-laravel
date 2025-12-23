@@ -1,9 +1,10 @@
 #!/bin/bash
 
-
 set -e
 
-ROOT_DIR="$(cd "$(dirname "$0")" && pwd)"
+# Get the project root directory (parent of cicd folder)
+SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+ROOT_DIR="$(cd "$SCRIPT_DIR/.." && pwd)"
 ROOT_ENV="$ROOT_DIR/.env"
 
 if [ ! -f "$ROOT_ENV" ]; then
