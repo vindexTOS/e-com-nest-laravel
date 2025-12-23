@@ -12,7 +12,7 @@ async function bootstrap() {
 
   app.useGlobalFilters(new HttpExceptionFilter());
   app.useGlobalInterceptors(new LoggingInterceptor());
-  
+
   app.useGlobalPipes(
     new ValidationPipe({
       whitelist: true,
@@ -32,7 +32,7 @@ async function bootstrap() {
     .build();
 
   app.setGlobalPrefix('api/gateway');
-  
+
   const document = SwaggerModule.createDocument(app, config);
   SwaggerModule.setup('docs', app, document);
 
@@ -40,7 +40,7 @@ async function bootstrap() {
   const redisHost = configService.get('REDIS_HOST') || 'redis';
   const redisPort = Number(configService.get('REDIS_PORT') || 6379);
   const port = Number(configService.get('PORT') || 3000);
-  
+
   app.connectMicroservice<MicroserviceOptions>({
     transport: Transport.REDIS,
     options: {
@@ -50,7 +50,6 @@ async function bootstrap() {
   });
   await app.startAllMicroservices();
 
-  
   await app.listen(port, '0.0.0.0');
 }
 bootstrap();

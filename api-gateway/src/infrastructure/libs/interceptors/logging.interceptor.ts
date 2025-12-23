@@ -29,11 +29,15 @@ export class LoggingInterceptor implements NestInterceptor {
         tap({
           next: () => {
             const responseTime = Date.now() - startTime;
-            this.logger.log(`GraphQL ${operationType}.${operationName} ${responseTime}ms`);
+            this.logger.log(
+              `GraphQL ${operationType}.${operationName} ${responseTime}ms`,
+            );
           },
           error: (error) => {
             const responseTime = Date.now() - startTime;
-            this.logger.error(`GraphQL ${operationType}.${operationName} ${responseTime}ms - Error: ${error.message}`);
+            this.logger.error(
+              `GraphQL ${operationType}.${operationName} ${responseTime}ms - Error: ${error.message}`,
+            );
           },
         }),
       );
@@ -42,7 +46,7 @@ export class LoggingInterceptor implements NestInterceptor {
     // Handle HTTP context
     const request = context.switchToHttp().getRequest<Request>();
     const response = context.switchToHttp().getResponse<Response>();
-    
+
     if (!request || !response) {
       return next.handle();
     }
@@ -84,4 +88,3 @@ export class LoggingInterceptor implements NestInterceptor {
     );
   }
 }
-

@@ -4,7 +4,10 @@ import { NotFoundException } from '@nestjs/common';
 import { ProductsService } from './products.service';
 import { ElasticsearchService } from '../../search/elasticsearch.service';
 import { RedisService } from '../../cache/redis.service';
-import { Product, ProductStatus } from '../../../domain/entities/product.entity';
+import {
+  Product,
+  ProductStatus,
+} from '../../../domain/entities/product.entity';
 import { CreateProductDto } from '../../../domain/dto/product/create-product.dto';
 import { UpdateProductDto } from '../../../domain/dto/product/update-product.dto';
 
@@ -95,9 +98,7 @@ describe('ProductsService', () => {
     });
 
     it('should sync products to ElasticsearchService during getProducts', async () => {
-      const mockProducts = [
-        { id: '1', name: 'Product 1', price: 100 },
-      ];
+      const mockProducts = [{ id: '1', name: 'Product 1', price: 100 }];
 
       const dbProducts = [
         { id: '1', name: 'Product 1', updated_at: new Date() },
@@ -311,7 +312,7 @@ describe('ProductsService', () => {
       const testService = module.get<ProductsService>(ProductsService);
 
       await expect(
-        testService.updateProduct('non-existent', { name: 'New Name' })
+        testService.updateProduct('non-existent', { name: 'New Name' }),
       ).rejects.toThrow(NotFoundException);
     });
   });

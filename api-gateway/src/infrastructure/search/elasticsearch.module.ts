@@ -18,4 +18,3 @@ import { ElasticsearchService } from './elasticsearch.service';
   exports: [ElasticsearchService, NestElasticsearchModule],
 })
 export class ElasticsearchModule {}
-

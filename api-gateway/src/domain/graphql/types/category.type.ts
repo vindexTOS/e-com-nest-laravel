@@ -65,4 +65,3 @@ export class CategoriesPaginatedResponse {
   @Field(() => Int)
   totalPages: number;
 }
-

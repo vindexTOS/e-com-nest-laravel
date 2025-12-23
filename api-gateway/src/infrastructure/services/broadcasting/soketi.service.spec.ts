@@ -29,7 +29,9 @@ describe('SoketiService', () => {
       trigger: jest.fn().mockResolvedValue(undefined),
     } as any;
 
-    (Pusher as jest.MockedClass<typeof Pusher>).mockImplementation(() => mockPusherInstance);
+    (Pusher as jest.MockedClass<typeof Pusher>).mockImplementation(
+      () => mockPusherInstance,
+    );
 
     const module: TestingModule = await Test.createTestingModule({
       providers: [
@@ -53,7 +55,11 @@ describe('SoketiService', () => {
 
       await service.broadcastNotification(channel, event, data);
 
-      expect(mockPusherInstance.trigger).toHaveBeenCalledWith(channel, event, data);
+      expect(mockPusherInstance.trigger).toHaveBeenCalledWith(
+        channel,
+        event,
+        data,
+      );
     });
   });
 

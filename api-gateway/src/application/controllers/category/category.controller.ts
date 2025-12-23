@@ -1,4 +1,11 @@
-import { Controller, Get, Query, Param, ParseIntPipe, DefaultValuePipe } from '@nestjs/common';
+import {
+  Controller,
+  Get,
+  Query,
+  Param,
+  ParseIntPipe,
+  DefaultValuePipe,
+} from '@nestjs/common';
 import { CategoriesService } from '../../../infrastructure/services/categories/categories.service';
 import { Public } from '../../../infrastructure/libs/decorators/public.decorator';
 import { ApiController } from '../../../infrastructure/libs/swagger/api-docs.decorator';
@@ -6,9 +13,7 @@ import { ApiController } from '../../../infrastructure/libs/swagger/api-docs.dec
 @ApiController('Categories')
 @Controller('categories')
 export class CategoryController {
-  constructor(
-    private categoriesService: CategoriesService,
-  ) {}
+  constructor(private categoriesService: CategoriesService) {}
 
   @Public()
   @Get()
@@ -34,4 +39,3 @@ export class CategoryController {
     return this.categoriesService.findOne(id);
   }
 }
-

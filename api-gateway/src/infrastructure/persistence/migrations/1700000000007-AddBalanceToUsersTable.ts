@@ -19,4 +19,3 @@ export class AddBalanceToUsersTable1700000000007 implements MigrationInterface {
     await queryRunner.dropColumn('users', 'balance');
   }
 }
-

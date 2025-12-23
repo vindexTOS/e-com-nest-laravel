@@ -4,9 +4,7 @@ import { CategoriesService } from './categories.service';
 import { Category } from '../../../domain/entities/category.entity';
 
 @Module({
-  imports: [
-    TypeOrmModule.forFeature([Category]),
-  ],
+  imports: [TypeOrmModule.forFeature([Category])],
   providers: [CategoriesService],
   exports: [CategoriesService],
 })

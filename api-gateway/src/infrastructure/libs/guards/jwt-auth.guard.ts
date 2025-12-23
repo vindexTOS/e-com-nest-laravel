@@ -32,4 +32,3 @@ export class JwtAuthGuard extends AuthGuard('jwt') {
     return context.switchToHttp().getRequest();
   }
 }
-

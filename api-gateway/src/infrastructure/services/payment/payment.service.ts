@@ -1,4 +1,9 @@
-import { Injectable, NotFoundException, BadRequestException, Logger } from '@nestjs/common';
+import {
+  Injectable,
+  NotFoundException,
+  BadRequestException,
+  Logger,
+} from '@nestjs/common';
 import { InjectRepository, InjectDataSource } from '@nestjs/typeorm';
 import { Repository, DataSource } from 'typeorm';
 import { User } from '../../../domain/entities/user.entity';
@@ -19,7 +24,10 @@ export class PaymentService {
     private readonly writeDataSource: DataSource,
   ) {}
 
-  async addBalance(userId: string, addBalanceDto: AddBalanceDto): Promise<{ balance: number; message: string }> {
+  async addBalance(
+    userId: string,
+    addBalanceDto: AddBalanceDto,
+  ): Promise<{ balance: number; message: string }> {
     const queryRunner = this.writeDataSource.createQueryRunner();
     await queryRunner.connect();
     let transactionStarted = false;
@@ -36,7 +44,11 @@ export class PaymentService {
         throw new NotFoundException(`User with ID ${userId} not found`);
       }
 
-      this.validateCard(addBalanceDto.cardNumber, addBalanceDto.cardExpiry, addBalanceDto.cardCvv);
+      this.validateCard(
+        addBalanceDto.cardNumber,
+        addBalanceDto.cardExpiry,
+        addBalanceDto.cardCvv,
+      );
 
       const currentBalance = parseFloat(user.balance?.toString() || '0');
       const newBalance = currentBalance + addBalanceDto.amount;
@@ -46,7 +58,9 @@ export class PaymentService {
 
       await queryRunner.commitTransaction();
 
-      this.logger.log(`Added $${addBalanceDto.amount} to user ${userId} balance. New balance: $${newBalance}`);
+      this.logger.log(
+        `Added $${addBalanceDto.amount} to user ${userId} balance. New balance: $${newBalance}`,
+      );
 
       return {
         balance: newBalance,
@@ -62,7 +76,9 @@ export class PaymentService {
     }
   }
 
-  async getBalance(userId: string): Promise<{ balance: number; message: string }> {
+  async getBalance(
+    userId: string,
+  ): Promise<{ balance: number; message: string }> {
     const user = await this.writeUserRepository.findOne({
       where: { id: userId },
     });
@@ -79,7 +95,10 @@ export class PaymentService {
     };
   }
 
-  async processPayment(userId: string, processPaymentDto: ProcessPaymentDto): Promise<{ success: boolean; message: string; order: Order }> {
+  async processPayment(
+    userId: string,
+    processPaymentDto: ProcessPaymentDto,
+  ): Promise<{ success: boolean; message: string; order: Order }> {
     const queryRunner = this.writeDataSource.createQueryRunner();
     await queryRunner.connect();
     let transactionStarted = false;
@@ -94,7 +113,9 @@ export class PaymentService {
       });
 
       if (!order) {
-        throw new NotFoundException(`Order with ID ${processPaymentDto.orderId} not found`);
+        throw new NotFoundException(
+          `Order with ID ${processPaymentDto.orderId} not found`,
+        );
       }
 
       if (order.userId !== userId) {
@@ -132,7 +153,9 @@ export class PaymentService {
         order.paymentStatus = 'paid';
         order.status = 'processing' as any;
 
-        this.logger.log(`Processed payment via wallet balance for order ${order.orderNumber}. Deducted $${orderTotal}`);
+        this.logger.log(
+          `Processed payment via wallet balance for order ${order.orderNumber}. Deducted $${orderTotal}`,
+        );
       } else if (paymentMethod === 'credit_card') {
         this.validateCard(
           processPaymentDto.cardNumber!,
@@ -151,9 +174,13 @@ export class PaymentService {
         order.paymentStatus = 'paid';
         order.status = 'processing' as any;
 
-        this.logger.log(`Processed payment via credit card for order ${order.orderNumber}. Amount: $${orderTotal}`);
+        this.logger.log(
+          `Processed payment via credit card for order ${order.orderNumber}. Amount: $${orderTotal}`,
+        );
       } else {
-        throw new BadRequestException(`Invalid payment method: ${paymentMethod}`);
+        throw new BadRequestException(
+          `Invalid payment method: ${paymentMethod}`,
+        );
       }
 
       await queryRunner.manager.save(Order, order);
@@ -174,11 +201,17 @@ export class PaymentService {
     }
   }
 
-  private validateCard(cardNumber: string, cardExpiry: string, cardCvv: string): void {
+  private validateCard(
+    cardNumber: string,
+    cardExpiry: string,
+    cardCvv: string,
+  ): void {
     const cleanCardNumber = cardNumber.replace(/\s+/g, '');
 
     if (cleanCardNumber.length < 13 || cleanCardNumber.length > 19) {
-      throw new BadRequestException('Invalid card number. Must be 13-19 digits.');
+      throw new BadRequestException(
+        'Invalid card number. Must be 13-19 digits.',
+      );
     }
 
     if (!/^\d+$/.test(cleanCardNumber)) {
@@ -208,17 +241,25 @@ export class PaymentService {
     cardCvv: string,
     amount: number,
   ): void {
-    this.logger.log('═══════════════════════════════════════════════════════════');
+    this.logger.log(
+      '═══════════════════════════════════════════════════════════',
+    );
     this.logger.log('💳 MOCK PAYMENT - Credit Card Processing');
-    this.logger.log('═══════════════════════════════════════════════════════════');
+    this.logger.log(
+      '═══════════════════════════════════════════════════════════',
+    );
     this.logger.log(`Card Number: ${this.maskCardNumber(cardNumber)}`);
     this.logger.log(`Expiry: ${cardExpiry}`);
     this.logger.log(`CVV: ***`);
     this.logger.log(`Amount: $${amount.toFixed(2)}`);
-    this.logger.log('───────────────────────────────────────────────────────────');
+    this.logger.log(
+      '───────────────────────────────────────────────────────────',
+    );
     this.logger.log('✅ MOCK: Payment authorized successfully');
     this.logger.log('✅ MOCK: Transaction ID: ' + this.generateTransactionId());
-    this.logger.log('═══════════════════════════════════════════════════════════');
+    this.logger.log(
+      '═══════════════════════════════════════════════════════════',
+    );
   }
 
   private maskCardNumber(cardNumber: string): string {
@@ -228,7 +269,13 @@ export class PaymentService {
   }
 
   private generateTransactionId(): string {
-    return 'TXN-' + Date.now() + '-' + Math.floor(Math.random() * 10000).toString().padStart(4, '0');
+    return (
+      'TXN-' +
+      Date.now() +
+      '-' +
+      Math.floor(Math.random() * 10000)
+        .toString()
+        .padStart(4, '0')
+    );
   }
 }
-

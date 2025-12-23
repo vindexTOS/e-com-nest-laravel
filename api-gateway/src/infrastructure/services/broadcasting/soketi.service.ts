@@ -10,7 +10,10 @@ export class SoketiService {
   constructor(private readonly configService: ConfigService) {
     const appId = this.configService.get<string>('PUSHER_APP_ID', 'ecom-app');
     const key = this.configService.get<string>('PUSHER_APP_KEY', 'ecom-key');
-    const secret = this.configService.get<string>('PUSHER_APP_SECRET', 'ecom-secret');
+    const secret = this.configService.get<string>(
+      'PUSHER_APP_SECRET',
+      'ecom-secret',
+    );
     const host = this.configService.get<string>('PUSHER_HOST', 'soketi');
     const port = this.configService.get<number>('PUSHER_PORT', 6001);
     const scheme = this.configService.get<string>('PUSHER_SCHEME', 'http');
@@ -28,21 +31,33 @@ export class SoketiService {
       cluster: this.configService.get<string>('PUSHER_APP_CLUSTER', 'mt1'),
     });
 
-    this.logger.log(`Soketi/Pusher service initialized (${scheme}://${host}:${port})`);
+    this.logger.log(
+      `Soketi/Pusher service initialized (${scheme}://${host}:${port})`,
+    );
   }
 
-  async broadcastNotification(channel: string, event: string, data: any): Promise<void> {
+  async broadcastNotification(
+    channel: string,
+    event: string,
+    data: any,
+  ): Promise<void> {
     try {
       await this.pusher.trigger(channel, event, data);
       this.logger.log(`Broadcasted to ${channel}:${event}`);
     } catch (error: any) {
-      this.logger.error(`Failed to broadcast to ${channel}:${event}: ${error.message}`, error.stack);
+      this.logger.error(
+        `Failed to broadcast to ${channel}:${event}: ${error.message}`,
+        error.stack,
+      );
       throw error;
     }
   }
 
   async broadcastAdminNotification(notification: any): Promise<void> {
-    await this.broadcastNotification('admin-notifications', 'new-notification', notification);
+    await this.broadcastNotification(
+      'admin-notifications',
+      'new-notification',
+      notification,
+    );
   }
 }
-

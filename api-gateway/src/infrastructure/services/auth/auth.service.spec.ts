@@ -112,9 +112,14 @@ describe('AuthService', () => {
         lastName: 'Doe',
       };
 
-      mockUserRepository.findOne.mockResolvedValue({ id: '1', email: registerDto.email } as any);
+      mockUserRepository.findOne.mockResolvedValue({
+        id: '1',
+        email: registerDto.email,
+      } as any);
 
-      await expect(service.register(registerDto)).rejects.toThrow(ConflictException);
+      await expect(service.register(registerDto)).rejects.toThrow(
+        ConflictException,
+      );
     });
   });
 
@@ -154,7 +159,9 @@ describe('AuthService', () => {
 
       mockUserRepository.findOne.mockResolvedValue(null);
 
-      await expect(service.login(loginDto)).rejects.toThrow(UnauthorizedException);
+      await expect(service.login(loginDto)).rejects.toThrow(
+        UnauthorizedException,
+      );
     });
 
     it('should throw UnauthorizedException if account is inactive', async () => {
@@ -173,7 +180,9 @@ describe('AuthService', () => {
       mockUserRepository.findOne.mockResolvedValue(mockUser as any);
       (bcrypt.compare as jest.Mock).mockResolvedValue(true);
 
-      await expect(service.login(loginDto)).rejects.toThrow(UnauthorizedException);
+      await expect(service.login(loginDto)).rejects.toThrow(
+        UnauthorizedException,
+      );
     });
   });
 
@@ -210,7 +219,9 @@ describe('AuthService', () => {
       mockJwtService.verify.mockReturnValue(mockPayload);
       mockRedisService.get.mockResolvedValue(true);
 
-      await expect(service.refreshToken(refreshToken)).rejects.toThrow(UnauthorizedException);
+      await expect(service.refreshToken(refreshToken)).rejects.toThrow(
+        UnauthorizedException,
+      );
     });
   });
 });

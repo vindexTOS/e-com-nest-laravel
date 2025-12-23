@@ -5,11 +5,8 @@ import { User } from '../../../domain/entities/user.entity';
 import { Order } from '../../../domain/entities/order.entity';
 
 @Module({
-  imports: [
-    TypeOrmModule.forFeature([User, Order], 'write'),
-  ],
+  imports: [TypeOrmModule.forFeature([User, Order], 'write')],
   providers: [PaymentService],
   exports: [PaymentService],
 })
 export class PaymentModule {}
-

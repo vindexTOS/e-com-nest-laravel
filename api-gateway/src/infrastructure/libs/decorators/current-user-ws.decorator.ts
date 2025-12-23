@@ -7,4 +7,3 @@ export const CurrentUserWs = createParamDecorator(
     return client.data.user;
   },
 );
-

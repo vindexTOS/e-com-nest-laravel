@@ -31,7 +31,9 @@ export class Category extends BaseEntity {
   @Column({ name: 'meta_description', type: 'text', nullable: true })
   metaDescription: string | null;
 
-  @ManyToOne(() => Category, (category) => category.children, { nullable: true })
+  @ManyToOne(() => Category, (category) => category.children, {
+    nullable: true,
+  })
   @JoinColumn({ name: 'parent_id' })
   parent: Category | null;
 
@@ -41,4 +43,3 @@ export class Category extends BaseEntity {
   @OneToMany(() => Product, (product) => product.category)
   products: Product[];
 }
-

@@ -16,7 +16,10 @@ import { RedisModule } from '../cache/redis.module';
     JwtModule.registerAsync({
       imports: [ConfigModule],
       useFactory: async (configService: ConfigService) => ({
-        secret: configService.get<string>('JWT_SECRET', 'your-super-secret-jwt-key-change-in-production'),
+        secret: configService.get<string>(
+          'JWT_SECRET',
+          'your-super-secret-jwt-key-change-in-production',
+        ),
         signOptions: {
           expiresIn: configService.get<string>('JWT_EXPIRATION', '1h'),
         },
@@ -30,4 +33,3 @@ import { RedisModule } from '../cache/redis.module';
   exports: [AuthService, JwtModule, PassportModule, JwtStrategy],
 })
 export class AuthModule {}
-

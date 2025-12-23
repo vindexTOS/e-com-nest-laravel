@@ -1,11 +1,4 @@
-import {
-  Controller,
-  Get,
-  Post,
-  Param,
-  Query,
-  UseGuards,
-} from '@nestjs/common';
+import { Controller, Get, Post, Param, Query, UseGuards } from '@nestjs/common';
 import { NotificationsService } from '../../../infrastructure/services/notifications/notifications.service';
 import { JwtAuthGuard } from '../../../infrastructure/libs/guards/jwt-auth.guard';
 import { RolesGuard } from '../../../infrastructure/libs/guards/roles.guard';
@@ -64,4 +57,3 @@ export class NotificationController {
     return this.notificationsService.markAllAsRead();
   }
 }
-

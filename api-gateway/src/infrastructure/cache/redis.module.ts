@@ -29,4 +29,3 @@ import { RedisService } from './redis.service';
   exports: [RedisService, CacheModule],
 })
 export class RedisModule {}
-

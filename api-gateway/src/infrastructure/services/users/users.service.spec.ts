@@ -63,7 +63,10 @@ describe('UsersService', () => {
 
       await service.findAll({ role: 'admin' });
 
-      expect(mockQueryBuilder.andWhere).toHaveBeenCalledWith('user.role = :role', { role: 'admin' });
+      expect(mockQueryBuilder.andWhere).toHaveBeenCalledWith(
+        'user.role = :role',
+        { role: 'admin' },
+      );
     });
   });
 

@@ -15,7 +15,9 @@ export class ElasticsearchService implements OnModuleInit {
 
   private async ensureIndices() {
     try {
-      const productIndexExists = await this.elasticsearchService.indices.exists({ index: 'products' });
+      const productIndexExists = await this.elasticsearchService.indices.exists(
+        { index: 'products' },
+      );
       if (!productIndexExists) {
         this.logger.log('Creating index: products');
         await this.elasticsearchService.indices.create({
@@ -32,7 +34,8 @@ export class ElasticsearchService implements OnModuleInit {
         });
       }
 
-      const categoryIndexExists = await this.elasticsearchService.indices.exists({ index: 'categories' });
+      const categoryIndexExists =
+        await this.elasticsearchService.indices.exists({ index: 'categories' });
       if (!categoryIndexExists) {
         this.logger.log('Creating index: categories');
         await this.elasticsearchService.indices.create({ index: 'categories' });
@@ -55,12 +58,14 @@ export class ElasticsearchService implements OnModuleInit {
           sku: product.sku,
           price: product.price,
           stock: product.stock ?? null,
-          lowStockThreshold: product.lowStockThreshold ?? product.low_stock_threshold ?? null,
+          lowStockThreshold:
+            product.lowStockThreshold ?? product.low_stock_threshold ?? null,
           status: product.status,
           categoryId: product.categoryId ?? product.category_id ?? null,
           categoryName: product.category?.name ?? null,
           image: product.image || null,
-          updatedAt: product.updatedAt ?? product.updated_at ?? new Date().toISOString(),
+          updatedAt:
+            product.updatedAt ?? product.updated_at ?? new Date().toISOString(),
         },
       });
     } catch (error: any) {
@@ -87,7 +92,11 @@ export class ElasticsearchService implements OnModuleInit {
     }
   }
 
-  async searchProducts(query: string, page: number = 1, limit: number = 10): Promise<any> {
+  async searchProducts(
+    query: string,
+    page: number = 1,
+    limit: number = 10,
+  ): Promise<any> {
     try {
       const from = (page - 1) * limit;
 
@@ -124,7 +133,10 @@ export class ElasticsearchService implements OnModuleInit {
           ...hit._source,
           score: hit._score,
         })),
-        total: typeof result.hits.total === 'object' ? result.hits.total.value : result.hits.total,
+        total:
+          typeof result.hits.total === 'object'
+            ? result.hits.total.value
+            : result.hits.total,
         page,
         limit,
       };
@@ -189,7 +201,10 @@ export class ElasticsearchService implements OnModuleInit {
           ...hit._source,
           score: hit._score,
         })),
-        total: typeof result.hits.total === 'object' ? result.hits.total.value : result.hits.total,
+        total:
+          typeof result.hits.total === 'object'
+            ? result.hits.total.value
+            : result.hits.total,
         page,
         limit,
       };
@@ -213,7 +228,11 @@ export class ElasticsearchService implements OnModuleInit {
     }
   }
 
-  async searchCategories(query: string, page: number = 1, limit: number = 10): Promise<any> {
+  async searchCategories(
+    query: string,
+    page: number = 1,
+    limit: number = 10,
+  ): Promise<any> {
     try {
       const from = (page - 1) * limit;
 
@@ -269,4 +288,3 @@ export class ElasticsearchService implements OnModuleInit {
     }
   }
 }
-

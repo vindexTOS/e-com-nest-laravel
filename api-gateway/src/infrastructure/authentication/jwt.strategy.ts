@@ -21,16 +21,21 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
     super({
       jwtFromRequest: ExtractJwt.fromAuthHeaderAsBearerToken(),
       ignoreExpiration: false,
-      secretOrKey: configService.get<string>('JWT_SECRET', 'test-secret-key-for-development-only'),
+      secretOrKey: configService.get<string>(
+        'JWT_SECRET',
+        'test-secret-key-for-development-only',
+      ),
       passReqToCallback: true,
     });
   }
 
   async validate(request: any, payload: JwtPayload) {
     const token = ExtractJwt.fromAuthHeaderAsBearerToken()(request);
-    
+
     if (token) {
-      const isBlacklisted = await this.redisService.get<boolean>(`blacklist:${token}`);
+      const isBlacklisted = await this.redisService.get<boolean>(
+        `blacklist:${token}`,
+      );
       if (isBlacklisted) {
         throw new UnauthorizedException('Token has been revoked');
       }
@@ -40,9 +45,9 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
       id: payload.sub,
       email: payload.email,
       role: payload.role,
-      firstName: (payload as any).firstName ?? (payload as any).first_name ?? null,
+      firstName:
+        (payload as any).firstName ?? (payload as any).first_name ?? null,
       lastName: (payload as any).lastName ?? (payload as any).last_name ?? null,
     };
   }
 }
-

@@ -18,8 +18,14 @@ import { ElasticsearchModule } from '../search/elasticsearch.module';
         host: configService.get<string>('DATABASE_READ_HOST', 'postgres-read'),
         port: configService.get<number>('DATABASE_READ_PORT', 5432),
         username: configService.get<string>('DATABASE_READ_USER', 'ecom_user'),
-        password: configService.get<string>('DATABASE_READ_PASSWORD', 'ecom_password'),
-        database: configService.get<string>('DATABASE_READ_NAME', 'ecom_db_read'),
+        password: configService.get<string>(
+          'DATABASE_READ_PASSWORD',
+          'ecom_password',
+        ),
+        database: configService.get<string>(
+          'DATABASE_READ_NAME',
+          'ecom_db_read',
+        ),
         entities: [join(__dirname, '../../../**/*.entity.{ts,js}')],
         synchronize: false,
         logging: false,
@@ -34,11 +40,20 @@ import { ElasticsearchModule } from '../search/elasticsearch.module';
       imports: [ConfigModule],
       useFactory: (configService: ConfigService) => ({
         type: 'postgres',
-        host: configService.get<string>('DATABASE_WRITE_HOST', 'postgres-write'),
+        host: configService.get<string>(
+          'DATABASE_WRITE_HOST',
+          'postgres-write',
+        ),
         port: configService.get<number>('DATABASE_WRITE_PORT', 5432),
         username: configService.get<string>('DATABASE_WRITE_USER', 'ecom_user'),
-        password: configService.get<string>('DATABASE_WRITE_PASSWORD', 'ecom_password'),
-        database: configService.get<string>('DATABASE_WRITE_NAME', 'ecom_db_write'),
+        password: configService.get<string>(
+          'DATABASE_WRITE_PASSWORD',
+          'ecom_password',
+        ),
+        database: configService.get<string>(
+          'DATABASE_WRITE_NAME',
+          'ecom_db_write',
+        ),
         entities: [join(__dirname, '../../../**/*.entity.{ts,js}')],
         migrations: [join(__dirname, '../migrations/*.{ts,js}')],
         synchronize: false,
@@ -58,8 +73,14 @@ import { ElasticsearchModule } from '../search/elasticsearch.module';
         host: configService.get<string>('DATABASE_READ_HOST', 'postgres-read'),
         port: configService.get<number>('DATABASE_READ_PORT', 5432),
         username: configService.get<string>('DATABASE_READ_USER', 'ecom_user'),
-        password: configService.get<string>('DATABASE_READ_PASSWORD', 'ecom_password'),
-        database: configService.get<string>('DATABASE_READ_NAME', 'ecom_db_read'),
+        password: configService.get<string>(
+          'DATABASE_READ_PASSWORD',
+          'ecom_password',
+        ),
+        database: configService.get<string>(
+          'DATABASE_READ_NAME',
+          'ecom_db_read',
+        ),
         entities: [join(__dirname, '../../../**/*.entity.{ts,js}')],
         synchronize: false,
         logging: false,
@@ -70,8 +91,11 @@ import { ElasticsearchModule } from '../search/elasticsearch.module';
       inject: [ConfigService],
     }),
   ],
-  providers: [DatabaseEventSubscriber, DatabaseConnectionHelper, InitialSyncService],
+  providers: [
+    DatabaseEventSubscriber,
+    DatabaseConnectionHelper,
+    InitialSyncService,
+  ],
   exports: [DatabaseEventSubscriber, DatabaseConnectionHelper],
 })
 export class DatabaseModule {}
-

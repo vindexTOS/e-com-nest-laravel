@@ -1,4 +1,10 @@
-import { MigrationInterface, QueryRunner, Table, TableIndex, TableForeignKey } from 'typeorm';
+import {
+  MigrationInterface,
+  QueryRunner,
+  Table,
+  TableIndex,
+  TableForeignKey,
+} from 'typeorm';
 
 export class CreateOrdersTable1700000000004 implements MigrationInterface {
   public async up(queryRunner: QueryRunner): Promise<void> {
@@ -33,7 +39,13 @@ export class CreateOrdersTable1700000000004 implements MigrationInterface {
           {
             name: 'status',
             type: 'enum',
-            enum: ['pending', 'processing', 'shipped', 'delivered', 'cancelled'],
+            enum: [
+              'pending',
+              'processing',
+              'shipped',
+              'delivered',
+              'cancelled',
+            ],
             default: "'pending'",
           },
           {
@@ -170,4 +182,3 @@ export class CreateOrdersTable1700000000004 implements MigrationInterface {
     await queryRunner.query(`DROP TYPE IF EXISTS fulfillment_status_enum;`);
   }
 }
-

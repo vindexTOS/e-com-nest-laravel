@@ -12,10 +12,15 @@ export class UserController {
   @ApiBearerAuth()
   @ApiOperation({ summary: 'Get all users (read-only)' })
   @ApiResponse({ status: 200, description: 'List of users' })
-  async findAll(@Query('limit') limit?: number, @Query('offset') offset?: number) {
+  async findAll(
+    @Query('limit') limit?: number,
+    @Query('offset') offset?: number,
+  ) {
     const parsedLimit = limit ? parseInt(limit.toString(), 10) : undefined;
     const parsedOffset = offset ? parseInt(offset.toString(), 10) : undefined;
-    return this.usersService.findAll({ limit: parsedLimit, offset: parsedOffset });
+    return this.usersService.findAll({
+      limit: parsedLimit,
+      offset: parsedOffset,
+    });
   }
 }
-

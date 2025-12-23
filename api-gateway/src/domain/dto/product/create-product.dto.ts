@@ -1,4 +1,13 @@
-import { IsString, IsNumber, IsOptional, IsEnum, IsBoolean, Min, MaxLength, IsUUID } from 'class-validator';
+import {
+  IsString,
+  IsNumber,
+  IsOptional,
+  IsEnum,
+  IsBoolean,
+  Min,
+  MaxLength,
+  IsUUID,
+} from 'class-validator';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { ProductStatus } from '../../entities/product.entity';
 
@@ -8,13 +17,19 @@ export class CreateProductDto {
   @MaxLength(255)
   name: string;
 
-  @ApiPropertyOptional({ example: 'wireless-mouse', description: 'Product slug (auto-generated if not provided)' })
+  @ApiPropertyOptional({
+    example: 'wireless-mouse',
+    description: 'Product slug (auto-generated if not provided)',
+  })
   @IsOptional()
   @IsString()
   @MaxLength(255)
   slug?: string;
 
-  @ApiPropertyOptional({ example: 'Ergonomic wireless mouse', description: 'Product description' })
+  @ApiPropertyOptional({
+    example: 'Ergonomic wireless mouse',
+    description: 'Product description',
+  })
   @IsOptional()
   @IsString()
   description?: string;
@@ -35,19 +50,27 @@ export class CreateProductDto {
   @Min(0)
   compareAtPrice?: number;
 
-  @ApiPropertyOptional({ example: 15.00, description: 'Cost price' })
+  @ApiPropertyOptional({ example: 15.0, description: 'Cost price' })
   @IsOptional()
   @IsNumber()
   @Min(0)
   costPrice?: number;
 
-  @ApiPropertyOptional({ example: 50, description: 'Stock quantity', default: 0 })
+  @ApiPropertyOptional({
+    example: 50,
+    description: 'Stock quantity',
+    default: 0,
+  })
   @IsOptional()
   @IsNumber()
   @Min(0)
   stock?: number;
 
-  @ApiPropertyOptional({ example: 10, description: 'Low stock threshold', default: 10 })
+  @ApiPropertyOptional({
+    example: 10,
+    description: 'Low stock threshold',
+    default: 10,
+  })
   @IsOptional()
   @IsNumber()
   @Min(0)
@@ -59,36 +82,56 @@ export class CreateProductDto {
   @Min(0)
   weight?: number;
 
-  @ApiPropertyOptional({ enum: ProductStatus, example: ProductStatus.ACTIVE, description: 'Product status', default: ProductStatus.DRAFT })
+  @ApiPropertyOptional({
+    enum: ProductStatus,
+    example: ProductStatus.ACTIVE,
+    description: 'Product status',
+    default: ProductStatus.DRAFT,
+  })
   @IsOptional()
   @IsEnum(ProductStatus)
   status?: ProductStatus;
 
-  @ApiPropertyOptional({ example: false, description: 'Is featured product', default: false })
+  @ApiPropertyOptional({
+    example: false,
+    description: 'Is featured product',
+    default: false,
+  })
   @IsOptional()
   @IsBoolean()
   isFeatured?: boolean;
 
-  @ApiPropertyOptional({ example: 'Wireless Mouse - Best Seller', description: 'Meta title for SEO' })
+  @ApiPropertyOptional({
+    example: 'Wireless Mouse - Best Seller',
+    description: 'Meta title for SEO',
+  })
   @IsOptional()
   @IsString()
   @MaxLength(255)
   metaTitle?: string;
 
-  @ApiPropertyOptional({ example: 'High-quality wireless mouse', description: 'Meta description for SEO' })
+  @ApiPropertyOptional({
+    example: 'High-quality wireless mouse',
+    description: 'Meta description for SEO',
+  })
   @IsOptional()
   @IsString()
   metaDescription?: string;
 
-  @ApiPropertyOptional({ example: '123e4567-e89b-12d3-a456-426614174000', description: 'Category ID' })
+  @ApiPropertyOptional({
+    example: '123e4567-e89b-12d3-a456-426614174000',
+    description: 'Category ID',
+  })
   @IsOptional()
   @IsUUID()
   categoryId?: string;
 
-  @ApiPropertyOptional({ example: 'products/mouse.jpg', description: 'Product image path' })
+  @ApiPropertyOptional({
+    example: 'products/mouse.jpg',
+    description: 'Product image path',
+  })
   @IsOptional()
   @IsString()
   @MaxLength(255)
   image?: string;
 }
-

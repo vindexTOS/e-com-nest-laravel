@@ -22,7 +22,9 @@ export class JwtWsGuard implements CanActivate {
     try {
       const payload = this.jwtService.verify(token, { secret: 'TEST' });
 
-      const isBlacklisted = await this.redisService.get<boolean>(`blacklist:${token}`);
+      const isBlacklisted = await this.redisService.get<boolean>(
+        `blacklist:${token}`,
+      );
       if (isBlacklisted) {
         throw new WsException('Token has been revoked');
       }
@@ -42,7 +44,8 @@ export class JwtWsGuard implements CanActivate {
   }
 
   private extractToken(client: Socket): string | null {
-    const authHeader = client.handshake.auth?.token || client.handshake.headers?.authorization;
+    const authHeader =
+      client.handshake.auth?.token || client.handshake.headers?.authorization;
     if (!authHeader) return null;
 
     if (authHeader.startsWith('Bearer ')) {
@@ -51,4 +54,3 @@ export class JwtWsGuard implements CanActivate {
     return authHeader;
   }
 }
-

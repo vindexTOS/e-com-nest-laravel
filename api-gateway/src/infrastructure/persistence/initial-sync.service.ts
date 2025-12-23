@@ -20,9 +20,11 @@ export class InitialSyncService implements OnModuleInit {
 
   private async syncAllData(): Promise<void> {
     try {
-      this.logger.log('Starting initial data sync from write to read database...');
-      
-      await new Promise(resolve => setTimeout(resolve, 2000));
+      this.logger.log(
+        'Starting initial data sync from write to read database...',
+      );
+
+      await new Promise((resolve) => setTimeout(resolve, 2000));
 
       await this.syncTable('users');
       await this.syncTable('categories');
@@ -81,9 +83,11 @@ export class InitialSyncService implements OnModuleInit {
         let synced = 0;
         for (const row of rows) {
           const cleanData = this.filterRelationData(row);
-          
+
           if (tableName === 'users' && !cleanData.password) {
-            this.logger.warn(`Skipping user ${cleanData.id} - missing password`);
+            this.logger.warn(
+              `Skipping user ${cleanData.id} - missing password`,
+            );
             continue;
           }
 
@@ -92,18 +96,25 @@ export class InitialSyncService implements OnModuleInit {
           }
 
           const insertColumns = Object.keys(cleanData);
-          const placeholders = insertColumns.map((_, i) => `$${i + 1}`).join(', ');
-          const values = insertColumns.map(col => this.convertValue(cleanData[col]));
-          const columnNames = insertColumns.map(col => `"${col}"`).join(', ');
+          const placeholders = insertColumns
+            .map((_, i) => `$${i + 1}`)
+            .join(', ');
+          const values = insertColumns.map((col) =>
+            this.convertValue(cleanData[col]),
+          );
+          const columnNames = insertColumns.map((col) => `"${col}"`).join(', ');
 
-          const updateColumns = insertColumns.filter(c => c !== 'id' && c !== 'created_at');
-          const updateClause = updateColumns.length > 0
-            ? updateColumns.map(c => `"${c}" = EXCLUDED."${c}"`).join(', ')
-            : '"updated_at" = EXCLUDED."updated_at"';
+          const updateColumns = insertColumns.filter(
+            (c) => c !== 'id' && c !== 'created_at',
+          );
+          const updateClause =
+            updateColumns.length > 0
+              ? updateColumns.map((c) => `"${c}" = EXCLUDED."${c}"`).join(', ')
+              : '"updated_at" = EXCLUDED."updated_at"';
 
           await readQueryRunner.query(
             `INSERT INTO "${tableName}" (${columnNames}) VALUES (${placeholders}) ON CONFLICT (id) DO UPDATE SET ${updateClause}`,
-            values
+            values,
           );
           synced++;
         }
@@ -112,28 +123,46 @@ export class InitialSyncService implements OnModuleInit {
         this.logger.log(`Synced ${synced} records from ${tableName}`);
       } catch (error: any) {
         await readQueryRunner.rollbackTransaction();
-        this.logger.error(`Failed to sync table ${tableName}: ${error.message}`, error.stack);
+        this.logger.error(
+          `Failed to sync table ${tableName}: ${error.message}`,
+          error.stack,
+        );
         throw error;
       } finally {
         await readQueryRunner.release();
         await writeQueryRunner.release();
       }
     } catch (error: any) {
-      this.logger.error(`Error syncing table ${tableName}: ${error.message}`, error.stack);
+      this.logger.error(
+        `Error syncing table ${tableName}: ${error.message}`,
+        error.stack,
+      );
     }
   }
 
-  private async getTableColumns(queryRunner: any, tableName: string): Promise<string[]> {
+  private async getTableColumns(
+    queryRunner: any,
+    tableName: string,
+  ): Promise<string[]> {
     const result = await queryRunner.query(
       `SELECT column_name FROM information_schema.columns WHERE table_name = $1 ORDER BY ordinal_position`,
-      [tableName]
+      [tableName],
     );
     return result.map((row: any) => row.column_name);
   }
 
   private filterRelationData(data: any): Record<string, any> {
     const cleanData: Record<string, any> = {};
-    const relationKeys = ['category', 'user', 'items', 'parent', 'children', 'products', 'order', 'product'];
+    const relationKeys = [
+      'category',
+      'user',
+      'items',
+      'parent',
+      'children',
+      'products',
+      'order',
+      'product',
+    ];
 
     for (const [key, value] of Object.entries(data)) {
       if (key.endsWith('_id')) {
@@ -145,7 +174,12 @@ export class InitialSyncService implements OnModuleInit {
         continue;
       }
 
-      if (key === 'id' || key === 'created_at' || key === 'updated_at' || key === 'deleted_at') {
+      if (
+        key === 'id' ||
+        key === 'created_at' ||
+        key === 'updated_at' ||
+        key === 'deleted_at'
+      ) {
         cleanData[key] = value;
         continue;
       }
@@ -184,7 +218,10 @@ export class InitialSyncService implements OnModuleInit {
       return value.toISOString();
     }
 
-    if (typeof value === 'string' && /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}/.test(value)) {
+    if (
+      typeof value === 'string' &&
+      /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}/.test(value)
+    ) {
       return value;
     }
 
@@ -210,7 +247,7 @@ export class InitialSyncService implements OnModuleInit {
       await readQueryRunner.connect();
 
       const products = await readQueryRunner.query(
-        `SELECT * FROM "products" WHERE deleted_at IS NULL ORDER BY created_at ASC`
+        `SELECT * FROM "products" WHERE deleted_at IS NULL ORDER BY created_at ASC`,
       );
 
       for (const product of products) {
@@ -238,14 +275,19 @@ export class InitialSyncService implements OnModuleInit {
           };
           await this.elasticsearchService.indexProduct(productData);
         } catch (error: any) {
-          this.logger.error(`Failed to sync product ${product.id} to Elasticsearch: ${error.message}`);
+          this.logger.error(
+            `Failed to sync product ${product.id} to Elasticsearch: ${error.message}`,
+          );
         }
       }
 
       await readQueryRunner.release();
       this.logger.log(`Synced ${products.length} products to Elasticsearch`);
     } catch (error: any) {
-      this.logger.error(`Failed to sync products to Elasticsearch: ${error.message}`, error.stack);
+      this.logger.error(
+        `Failed to sync products to Elasticsearch: ${error.message}`,
+        error.stack,
+      );
     }
   }
 
@@ -258,7 +300,11 @@ export class InitialSyncService implements OnModuleInit {
         host: redisHost,
         port: redisPort,
       });
-      await cacheClient.setex('products:cache:version', 60 * 60 * 24 * 365 * 10, Date.now().toString());
+      await cacheClient.setex(
+        'products:cache:version',
+        60 * 60 * 24 * 365 * 10,
+        Date.now().toString(),
+      );
       await cacheClient.quit();
       this.logger.log('Product cache invalidated');
     } catch (error: any) {
@@ -266,4 +312,3 @@ export class InitialSyncService implements OnModuleInit {
     }
   }
 }
-

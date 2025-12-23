@@ -1,4 +1,10 @@
-import { MigrationInterface, QueryRunner, Table, TableIndex, TableForeignKey } from 'typeorm';
+import {
+  MigrationInterface,
+  QueryRunner,
+  Table,
+  TableIndex,
+  TableForeignKey,
+} from 'typeorm';
 
 export class CreateOrderItemsTable1700000000005 implements MigrationInterface {
   public async up(queryRunner: QueryRunner): Promise<void> {
@@ -107,4 +113,3 @@ export class CreateOrderItemsTable1700000000005 implements MigrationInterface {
     await queryRunner.dropTable('order_items');
   }
 }
-

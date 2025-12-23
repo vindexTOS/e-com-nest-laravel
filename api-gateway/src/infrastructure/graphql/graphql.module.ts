@@ -21,4 +21,3 @@ import { CategoriesModule } from '../services/categories/categories.module';
   providers: [CategoryResolver],
 })
 export class GqlModule {}
-

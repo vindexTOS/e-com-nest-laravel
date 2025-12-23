@@ -26,4 +26,3 @@ import { EmailModule } from '../services/email/email.module';
   exports: [QueueService, BullModule],
 })
 export class QueueModule {}
-

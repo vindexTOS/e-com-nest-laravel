@@ -6,4 +6,3 @@ import { SoketiService } from './soketi.service';
   exports: [SoketiService],
 })
 export class BroadcastingModule {}
-

@@ -114,7 +114,11 @@ describe('OrdersService', () => {
       mockQueryBuilder.getCount.mockResolvedValue(2);
       mockQueryBuilder.getMany.mockResolvedValue(mockOrders as any);
 
-      const result = await service.findAll({ userId: 'user-1', limit: 10, offset: 0 });
+      const result = await service.findAll({
+        userId: 'user-1',
+        limit: 10,
+        offset: 0,
+      });
 
       expect(result.data).toEqual(mockOrders);
       expect(result.total).toBe(2);
@@ -122,11 +126,16 @@ describe('OrdersService', () => {
 
     it('should filter by status', async () => {
       mockQueryBuilder.getCount.mockResolvedValue(1);
-      mockQueryBuilder.getMany.mockResolvedValue([{ id: '1', status: 'pending' }] as any);
+      mockQueryBuilder.getMany.mockResolvedValue([
+        { id: '1', status: 'pending' },
+      ] as any);
 
       await service.findAll({ status: 'pending' });
 
-      expect(mockQueryBuilder.andWhere).toHaveBeenCalledWith('order.status = :status', { status: 'pending' });
+      expect(mockQueryBuilder.andWhere).toHaveBeenCalledWith(
+        'order.status = :status',
+        { status: 'pending' },
+      );
     });
   });
 
@@ -149,7 +158,9 @@ describe('OrdersService', () => {
     it('should throw NotFoundException if order not found', async () => {
       mockOrderRepository.findOne.mockResolvedValue(null);
 
-      await expect(service.findOne('invalid')).rejects.toThrow(NotFoundException);
+      await expect(service.findOne('invalid')).rejects.toThrow(
+        NotFoundException,
+      );
     });
   });
 
@@ -220,7 +231,9 @@ describe('OrdersService', () => {
     it('should throw NotFoundException if user not found', async () => {
       mockQueryRunner.manager.findOne.mockResolvedValueOnce(null);
 
-      await expect(service.createOrder(createOrderDto)).rejects.toThrow(NotFoundException);
+      await expect(service.createOrder(createOrderDto)).rejects.toThrow(
+        NotFoundException,
+      );
     });
 
     it('should throw BadRequestException if insufficient stock', async () => {
@@ -230,7 +243,9 @@ describe('OrdersService', () => {
         .mockResolvedValueOnce(mockUser as any)
         .mockResolvedValueOnce(lowStockProduct as any);
 
-      await expect(service.createOrder(createOrderDto)).rejects.toThrow(BadRequestException);
+      await expect(service.createOrder(createOrderDto)).rejects.toThrow(
+        BadRequestException,
+      );
     });
   });
 
@@ -248,7 +263,9 @@ describe('OrdersService', () => {
     it('should throw NotFoundException if order not found', async () => {
       mockOrderRepository.restore.mockResolvedValue({ affected: 0 } as any);
 
-      await expect(service.restore('invalid')).rejects.toThrow(NotFoundException);
+      await expect(service.restore('invalid')).rejects.toThrow(
+        NotFoundException,
+      );
     });
   });
 
@@ -264,7 +281,9 @@ describe('OrdersService', () => {
     it('should throw NotFoundException if order not found', async () => {
       mockOrderRepository.softDelete.mockResolvedValue({ affected: 0 } as any);
 
-      await expect(service.softDelete('invalid')).rejects.toThrow(NotFoundException);
+      await expect(service.softDelete('invalid')).rejects.toThrow(
+        NotFoundException,
+      );
     });
   });
 });

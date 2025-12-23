@@ -22,11 +22,13 @@ export class NotificationsService {
     );
   }
 
-  async findAllForAdmins(options: {
-    limit?: number;
-    offset?: number;
-    unreadOnly?: boolean;
-  } = {}): Promise<{ data: Notification[]; total: number; unreadCount: number }> {
+  async findAllForAdmins(
+    options: {
+      limit?: number;
+      offset?: number;
+      unreadOnly?: boolean;
+    } = {},
+  ): Promise<{ data: Notification[]; total: number; unreadCount: number }> {
     const query = this.notificationRepository
       .createQueryBuilder('notification')
       .where('notification.userId IS NULL') // For all admins
@@ -90,12 +92,16 @@ export class NotificationsService {
 
       // Wait a bit for replication to sync, then refresh from read DB
       await new Promise((resolve) => setTimeout(resolve, 500));
-      
-      return await this.notificationRepository.findOne({
-        where: { id },
-      }) || notification;
+
+      return (
+        (await this.notificationRepository.findOne({
+          where: { id },
+        })) || notification
+      );
     } catch (error) {
-      console.error(`Failed to mark notification as read via Laravel: ${error}`);
+      console.error(
+        `Failed to mark notification as read via Laravel: ${error}`,
+      );
       throw new NotFoundException(`Failed to mark notification as read`);
     }
   }
@@ -132,7 +138,9 @@ export class NotificationsService {
         count: result.count,
       };
     } catch (error) {
-      console.error(`Failed to mark all notifications as read via Laravel: ${error}`);
+      console.error(
+        `Failed to mark all notifications as read via Laravel: ${error}`,
+      );
       throw new Error(`Failed to mark all notifications as read`);
     }
   }
@@ -158,7 +166,9 @@ export class NotificationsService {
         title: notificationData.title,
         message: notificationData.message,
         data: notificationData.data,
-        readAt: notificationData.read_at ? new Date(notificationData.read_at) : null,
+        readAt: notificationData.read_at
+          ? new Date(notificationData.read_at)
+          : null,
       });
       return this.notificationRepository.save(existing);
     }
@@ -170,12 +180,17 @@ export class NotificationsService {
       title: notificationData.title,
       message: notificationData.message,
       data: notificationData.data,
-      readAt: notificationData.read_at ? new Date(notificationData.read_at) : null,
-      createdAt: notificationData.created_at ? new Date(notificationData.created_at) : new Date(),
-      updatedAt: notificationData.updated_at ? new Date(notificationData.updated_at) : new Date(),
+      readAt: notificationData.read_at
+        ? new Date(notificationData.read_at)
+        : null,
+      createdAt: notificationData.created_at
+        ? new Date(notificationData.created_at)
+        : new Date(),
+      updatedAt: notificationData.updated_at
+        ? new Date(notificationData.updated_at)
+        : new Date(),
     });
 
     return this.notificationRepository.save(notification);
   }
 }
-

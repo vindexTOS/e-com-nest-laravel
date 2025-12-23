@@ -12,7 +12,9 @@ export class QueueService {
     private readonly emailQueue: Queue,
   ) {}
 
-  async addOrderConfirmationEmailJob(data: SendOrderEmailJobData): Promise<void> {
+  async addOrderConfirmationEmailJob(
+    data: SendOrderEmailJobData,
+  ): Promise<void> {
     try {
       const job = await this.emailQueue.add('send-order-confirmation', data, {
         attempts: 3,
@@ -52,4 +54,3 @@ export class QueueService {
     return { waiting, active, completed, failed };
   }
 }
-

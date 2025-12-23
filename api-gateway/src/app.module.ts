@@ -52,7 +52,14 @@ import { UsersGateway } from './infrastructure/websockets/users.gateway';
     PaymentModule,
     EventsModule,
   ],
-  controllers: [ProductController, OrderController, UserController, StorageController, NotificationController, PaymentController],
+  controllers: [
+    ProductController,
+    OrderController,
+    UserController,
+    StorageController,
+    NotificationController,
+    PaymentController,
+  ],
   providers: [
     UsersService,
     UsersGateway,

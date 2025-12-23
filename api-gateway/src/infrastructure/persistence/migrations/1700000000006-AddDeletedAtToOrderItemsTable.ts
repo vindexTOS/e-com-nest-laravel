@@ -16,4 +16,3 @@ export class AddDeletedAtToOrderItemsTable1700000000006 implements MigrationInte
     await queryRunner.dropColumn('order_items', 'deleted_at');
   }
 }
-

@@ -22,12 +22,15 @@ export class DatabaseConnectionHelper {
     return this.defaultDataSource;
   }
 
-  async withWriteConnection<T>(fn: (connection: DataSource) => Promise<T>): Promise<T> {
+  async withWriteConnection<T>(
+    fn: (connection: DataSource) => Promise<T>,
+  ): Promise<T> {
     return fn(this.writeDataSource);
   }
 
-  async withReadConnection<T>(fn: (connection: DataSource) => Promise<T>): Promise<T> {
+  async withReadConnection<T>(
+    fn: (connection: DataSource) => Promise<T>,
+  ): Promise<T> {
     return fn(this.readDataSource);
   }
 }
-

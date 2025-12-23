@@ -30,4 +30,3 @@ export class CategoriesFilterInput {
   @IsBoolean()
   isActive?: boolean;
 }
-

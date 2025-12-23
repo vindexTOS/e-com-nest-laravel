@@ -84,7 +84,10 @@ export class OrderController {
   @ApiBearerAuth()
   @ApiOperation({ summary: 'Create a new order' })
   @ApiResponse({ status: 201, description: 'Order created successfully' })
-  @ApiResponse({ status: 400, description: 'Invalid input data or insufficient stock' })
+  @ApiResponse({
+    status: 400,
+    description: 'Invalid input data or insufficient stock',
+  })
   @ApiResponse({ status: 401, description: 'Unauthorized' })
   async create(
     @Body() createOrderDto: CreateOrderDto,
@@ -96,6 +99,4 @@ export class OrderController {
     }
     return this.ordersService.createOrder(createOrderDto);
   }
-
 }
-

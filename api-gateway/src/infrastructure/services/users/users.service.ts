@@ -10,7 +10,15 @@ export class UsersService {
     private readonly userRepository: Repository<User>,
   ) {}
 
-  async findAll(options: { limit?: number; offset?: number; search?: string; role?: string; withDeleted?: boolean } = {}): Promise<{ data: User[]; total: number }> {
+  async findAll(
+    options: {
+      limit?: number;
+      offset?: number;
+      search?: string;
+      role?: string;
+      withDeleted?: boolean;
+    } = {},
+  ): Promise<{ data: User[]; total: number }> {
     const query = this.userRepository
       .createQueryBuilder('user')
       .orderBy('user.createdAt', 'DESC');
@@ -23,7 +31,10 @@ export class UsersService {
 
     if (options.search) {
       const term = `%${options.search}%`;
-      query.andWhere('(user.email ILIKE :term OR user.firstName ILIKE :term OR user.lastName ILIKE :term)', { term });
+      query.andWhere(
+        '(user.email ILIKE :term OR user.firstName ILIKE :term OR user.lastName ILIKE :term)',
+        { term },
+      );
     }
 
     if (options.role) {
@@ -60,4 +71,3 @@ export class UsersService {
     }
   }
 }
-

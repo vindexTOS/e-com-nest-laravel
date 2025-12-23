@@ -1,5 +1,18 @@
-import { Controller, Post, Get, Body, UseGuards, HttpCode, HttpStatus } from '@nestjs/common';
-import { ApiTags, ApiOperation, ApiBearerAuth, ApiResponse } from '@nestjs/swagger';
+import {
+  Controller,
+  Post,
+  Get,
+  Body,
+  UseGuards,
+  HttpCode,
+  HttpStatus,
+} from '@nestjs/common';
+import {
+  ApiTags,
+  ApiOperation,
+  ApiBearerAuth,
+  ApiResponse,
+} from '@nestjs/swagger';
 import { PaymentService } from '../../../infrastructure/services/payment/payment.service';
 import { JwtAuthGuard } from '../../../infrastructure/libs/guards/jwt-auth.guard';
 import { RolesGuard } from '../../../infrastructure/libs/guards/roles.guard';
@@ -49,4 +62,3 @@ export class PaymentController {
     return this.paymentService.processPayment(user.id, processPaymentDto);
   }
 }
-

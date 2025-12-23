@@ -18,4 +18,3 @@ export interface SendOrderEmailJobData {
   shippingAddress?: string;
   billingAddress?: string;
 }
-

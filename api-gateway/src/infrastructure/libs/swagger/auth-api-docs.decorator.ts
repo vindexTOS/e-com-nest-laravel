@@ -31,4 +31,3 @@ export const ApiLogout = () =>
     ApiResponse({ status: 200, description: 'Logged out successfully' }),
     ApiResponse({ status: 401, description: 'Unauthorized' }),
   );
-

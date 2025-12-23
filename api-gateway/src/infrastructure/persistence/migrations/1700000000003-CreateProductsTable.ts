@@ -1,4 +1,10 @@
-import { MigrationInterface, QueryRunner, Table, TableIndex, TableForeignKey } from 'typeorm';
+import {
+  MigrationInterface,
+  QueryRunner,
+  Table,
+  TableIndex,
+  TableForeignKey,
+} from 'typeorm';
 
 export class CreateProductsTable1700000000003 implements MigrationInterface {
   public async up(queryRunner: QueryRunner): Promise<void> {
@@ -154,4 +160,3 @@ export class CreateProductsTable1700000000003 implements MigrationInterface {
     await queryRunner.query(`DROP TYPE IF EXISTS product_status_enum;`);
   }
 }
-

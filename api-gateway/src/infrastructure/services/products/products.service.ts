@@ -1,9 +1,18 @@
-import { Injectable, Logger, OnModuleInit, NotFoundException, Inject } from '@nestjs/common';
+import {
+  Injectable,
+  Logger,
+  OnModuleInit,
+  NotFoundException,
+  Inject,
+} from '@nestjs/common';
 import { ElasticsearchService } from '../../search/elasticsearch.service';
 import { RedisService } from '../../cache/redis.service';
 import { InjectRepository, InjectDataSource } from '@nestjs/typeorm';
 import { Repository, DataSource } from 'typeorm';
-import { Product, ProductStatus } from '../../../domain/entities/product.entity';
+import {
+  Product,
+  ProductStatus,
+} from '../../../domain/entities/product.entity';
 import { CreateProductDto } from '../../../domain/dto/product/create-product.dto';
 import { UpdateProductDto } from '../../../domain/dto/product/update-product.dto';
 
@@ -20,7 +29,7 @@ export class ProductsService implements OnModuleInit {
   private readonly logger = new Logger(ProductsService.name);
   private readonly CACHE_TTL = 3600;
   private readonly PRODUCTS_CACHE_VERSION_KEY = 'products:cache:version';
-  private readonly PRODUCTS_CACHE_VERSION_TTL = 60 * 60 * 24 * 365 * 10; 
+  private readonly PRODUCTS_CACHE_VERSION_TTL = 60 * 60 * 24 * 365 * 10;
 
   constructor(
     private readonly elasticsearchService: ElasticsearchService,
@@ -36,17 +45,25 @@ export class ProductsService implements OnModuleInit {
   ) {}
 
   private async getProductsCacheVersion(): Promise<string> {
-    const existing = await this.redisService.get<string>(this.PRODUCTS_CACHE_VERSION_KEY);
+    const existing = await this.redisService.get<string>(
+      this.PRODUCTS_CACHE_VERSION_KEY,
+    );
     if (existing) return existing;
 
     // Initialize lazily so first request doesn't fail on missing key
     const initial = Date.now().toString();
-    await this.redisService.set(this.PRODUCTS_CACHE_VERSION_KEY, initial, this.PRODUCTS_CACHE_VERSION_TTL);
+    await this.redisService.set(
+      this.PRODUCTS_CACHE_VERSION_KEY,
+      initial,
+      this.PRODUCTS_CACHE_VERSION_TTL,
+    );
     return initial;
   }
 
   async onModuleInit() {
-    this.logger.log('ProductsService initialized, scheduling Elasticsearch sync...');
+    this.logger.log(
+      'ProductsService initialized, scheduling Elasticsearch sync...',
+    );
     // Delay sync to allow database and ES to be fully ready
     setTimeout(async () => {
       try {
@@ -81,28 +98,38 @@ export class ProductsService implements OnModuleInit {
         page: 1,
         limit: 1,
       });
-      
-      const total = typeof result.total === 'object' ? result.total.value : result.total;
-      
+
+      const total =
+        typeof result.total === 'object' ? result.total.value : result.total;
+
       if (total === 0) {
-        this.logger.log('Elasticsearch index is empty. Triggering automatic sync...');
+        this.logger.log(
+          'Elasticsearch index is empty. Triggering automatic sync...',
+        );
         await this.syncToElasticsearch();
       } else {
-        this.logger.log(`Elasticsearch already has ${total} products. Skipping initial sync.`);
+        this.logger.log(
+          `Elasticsearch already has ${total} products. Skipping initial sync.`,
+        );
       }
     } catch (error) {
       this.logger.error('Failed to perform initial sync check:', error);
     }
   }
 
-  async syncToElasticsearch(): Promise<{ message: string; productsCount: number }> {
+  async syncToElasticsearch(): Promise<{
+    message: string;
+    productsCount: number;
+  }> {
     this.logger.log('Starting full sync to Elasticsearch...');
 
     const products = await this.readDataSource.query(
-      `SELECT * FROM products WHERE deleted_at IS NULL ORDER BY updated_at DESC`
+      `SELECT * FROM products WHERE deleted_at IS NULL ORDER BY updated_at DESC`,
     );
 
-    this.logger.log(`Found ${products.length} products in read database, syncing to Elasticsearch...`);
+    this.logger.log(
+      `Found ${products.length} products in read database, syncing to Elasticsearch...`,
+    );
 
     let synced = 0;
     for (const product of products) {
@@ -131,11 +158,15 @@ export class ProductsService implements OnModuleInit {
         await this.elasticsearchService.indexProduct(productData);
         synced++;
       } catch (error: any) {
-        this.logger.error(`Failed to sync product ${product.id} to Elasticsearch: ${error.message}`);
+        this.logger.error(
+          `Failed to sync product ${product.id} to Elasticsearch: ${error.message}`,
+        );
       }
     }
 
-    this.logger.log(`Synced ${synced}/${products.length} products to Elasticsearch`);
+    this.logger.log(
+      `Synced ${synced}/${products.length} products to Elasticsearch`,
+    );
 
     return {
       message: `Synced ${synced} products to Elasticsearch.`,
@@ -143,7 +174,10 @@ export class ProductsService implements OnModuleInit {
     };
   }
 
-  async syncFromWriteDatabase(): Promise<{ message: string; productsCount: number }> {
+  async syncFromWriteDatabase(): Promise<{
+    message: string;
+    productsCount: number;
+  }> {
     this.logger.log('Starting full sync from write database...');
 
     const writeQueryRunner = this.writeDataSource.createQueryRunner();
@@ -151,10 +185,12 @@ export class ProductsService implements OnModuleInit {
 
     try {
       const products = await writeQueryRunner.query(
-        `SELECT * FROM products WHERE deleted_at IS NULL ORDER BY created_at`
+        `SELECT * FROM products WHERE deleted_at IS NULL ORDER BY created_at`,
       );
 
-      this.logger.log(`Found ${products.length} products in write database, syncing to read database and Elasticsearch...`);
+      this.logger.log(
+        `Found ${products.length} products in write database, syncing to read database and Elasticsearch...`,
+      );
 
       const readQueryRunner = this.readDataSource.createQueryRunner();
       await readQueryRunner.connect();
@@ -164,7 +200,12 @@ export class ProductsService implements OnModuleInit {
         for (const product of products) {
           const cleanData: Record<string, any> = {};
           for (const [key, value] of Object.entries(product)) {
-            if (key === 'category' || (typeof value === 'object' && value !== null && !(value instanceof Date))) {
+            if (
+              key === 'category' ||
+              (typeof value === 'object' &&
+                value !== null &&
+                !(value instanceof Date))
+            ) {
               continue;
             }
             cleanData[key] = value;
@@ -172,17 +213,22 @@ export class ProductsService implements OnModuleInit {
 
           const columns = Object.keys(cleanData);
           const placeholders = columns.map((_, i) => `$${i + 1}`).join(', ');
-          const values = columns.map(col => this.convertProductValue(cleanData[col]));
-          const columnNames = columns.map(col => `"${col}"`).join(', ');
-          
-          const updateColumns = columns.filter(c => c !== 'id' && c !== 'created_at');
-          const updateClause = updateColumns.length > 0 
-            ? updateColumns.map(c => `"${c}" = EXCLUDED."${c}"`).join(', ')
-            : '"updated_at" = EXCLUDED."updated_at"';
+          const values = columns.map((col) =>
+            this.convertProductValue(cleanData[col]),
+          );
+          const columnNames = columns.map((col) => `"${col}"`).join(', ');
+
+          const updateColumns = columns.filter(
+            (c) => c !== 'id' && c !== 'created_at',
+          );
+          const updateClause =
+            updateColumns.length > 0
+              ? updateColumns.map((c) => `"${c}" = EXCLUDED."${c}"`).join(', ')
+              : '"updated_at" = EXCLUDED."updated_at"';
 
           await readQueryRunner.query(
             `INSERT INTO "products" (${columnNames}) VALUES (${placeholders}) ON CONFLICT (id) DO UPDATE SET ${updateClause}`,
-            values
+            values,
           );
 
           await this.elasticsearchService.indexProduct(cleanData);
@@ -190,7 +236,9 @@ export class ProductsService implements OnModuleInit {
         }
 
         await this.invalidateProductCache();
-        this.logger.log(`Synced ${syncedCount} products from write database to read database and Elasticsearch.`);
+        this.logger.log(
+          `Synced ${syncedCount} products from write database to read database and Elasticsearch.`,
+        );
 
         return {
           message: 'Sync from write database completed successfully',
@@ -211,14 +259,19 @@ export class ProductsService implements OnModuleInit {
     if (value instanceof Date) {
       return value.toISOString();
     }
-    if (typeof value === 'string' && /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}/.test(value)) {
+    if (
+      typeof value === 'string' &&
+      /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}/.test(value)
+    ) {
       return value;
     }
     return value;
   }
 
   async syncProductToElasticsearch(productData: any): Promise<void> {
-    this.logger.log(`Syncing individual product to Elasticsearch: ${productData.id}`);
+    this.logger.log(
+      `Syncing individual product to Elasticsearch: ${productData.id}`,
+    );
 
     // Convert the product data to the format expected by Elasticsearch
     const product = {
@@ -301,7 +354,10 @@ export class ProductsService implements OnModuleInit {
       .where('product.deletedAt IS NOT NULL');
 
     if (search) {
-      query.andWhere('(product.name ILIKE :search OR product.sku ILIKE :search)', { search: `%${search}%` });
+      query.andWhere(
+        '(product.name ILIKE :search OR product.sku ILIKE :search)',
+        { search: `%${search}%` },
+      );
     }
 
     if (categoryId) {
@@ -356,15 +412,21 @@ export class ProductsService implements OnModuleInit {
       return cached;
     }
 
-    const result = await this.elasticsearchService.searchProducts(query, page, limit);
+    const result = await this.elasticsearchService.searchProducts(
+      query,
+      page,
+      limit,
+    );
 
     const searchResult: SearchResult<any> = {
       data: result.hits,
-      total: typeof result.total === 'object' ? result.total.value : result.total,
+      total:
+        typeof result.total === 'object' ? result.total.value : result.total,
       page,
       limit,
       totalPages: Math.ceil(
-        (typeof result.total === 'object' ? result.total.value : result.total) / limit,
+        (typeof result.total === 'object' ? result.total.value : result.total) /
+          limit,
       ),
     };
 
@@ -386,15 +448,21 @@ export class ProductsService implements OnModuleInit {
       return cached;
     }
 
-    const result = await this.elasticsearchService.searchCategories(query, page, limit);
+    const result = await this.elasticsearchService.searchCategories(
+      query,
+      page,
+      limit,
+    );
 
     const searchResult: SearchResult<any> = {
       data: result.hits,
-      total: typeof result.total === 'object' ? result.total.value : result.total,
+      total:
+        typeof result.total === 'object' ? result.total.value : result.total,
       page,
       limit,
       totalPages: Math.ceil(
-        (typeof result.total === 'object' ? result.total.value : result.total) / limit,
+        (typeof result.total === 'object' ? result.total.value : result.total) /
+          limit,
       ),
     };
 
@@ -404,9 +472,15 @@ export class ProductsService implements OnModuleInit {
   }
 
   async invalidateProductCache(): Promise<void> {
-    this.logger.debug('Product cache invalidation requested (bumping products cache version)');
+    this.logger.debug(
+      'Product cache invalidation requested (bumping products cache version)',
+    );
     const next = Date.now().toString();
-    await this.redisService.set(this.PRODUCTS_CACHE_VERSION_KEY, next, this.PRODUCTS_CACHE_VERSION_TTL);
+    await this.redisService.set(
+      this.PRODUCTS_CACHE_VERSION_KEY,
+      next,
+      this.PRODUCTS_CACHE_VERSION_TTL,
+    );
   }
 
   async deleteProductFromElasticsearch(id: string): Promise<void> {
@@ -415,7 +489,8 @@ export class ProductsService implements OnModuleInit {
 
   async createProduct(createProductDto: CreateProductDto): Promise<Product> {
     // Generate slug if not provided
-    const slug = createProductDto.slug || this.generateSlug(createProductDto.name);
+    const slug =
+      createProductDto.slug || this.generateSlug(createProductDto.name);
 
     // Write to WRITE database
     const product = this.writeProductRepository.create({
@@ -449,7 +524,10 @@ export class ProductsService implements OnModuleInit {
     return freshProduct;
   }
 
-  async updateProduct(id: string, updateProductDto: UpdateProductDto): Promise<Product> {
+  async updateProduct(
+    id: string,
+    updateProductDto: UpdateProductDto,
+  ): Promise<Product> {
     // Check in write database
     const product = await this.writeProductRepository.findOne({
       where: { id },
@@ -489,9 +567,13 @@ export class ProductsService implements OnModuleInit {
     return freshProduct;
   }
 
-  private async publishProductEvent(operation: 'INSERT' | 'UPDATE' | 'DELETE', product: Product | { id: string }): Promise<void> {
+  private async publishProductEvent(
+    operation: 'INSERT' | 'UPDATE' | 'DELETE',
+    product: Product | { id: string },
+  ): Promise<void> {
     try {
-      const serializedData = product instanceof Product ? this.serializeProduct(product) : product;
+      const serializedData =
+        product instanceof Product ? this.serializeProduct(product) : product;
       const eventData = {
         table: 'products',
         operation,
@@ -501,16 +583,26 @@ export class ProductsService implements OnModuleInit {
       };
 
       const message = JSON.stringify(eventData);
-      const subscribers = await this.redisService.publish('database:events', message);
-      
-      this.logger.log(`Published product event: ${operation} for product ${eventData.id} (subscribers: ${subscribers})`);
+      const subscribers = await this.redisService.publish(
+        'database:events',
+        message,
+      );
+
+      this.logger.log(
+        `Published product event: ${operation} for product ${eventData.id} (subscribers: ${subscribers})`,
+      );
       this.logger.debug(`Event data: ${message.substring(0, 200)}...`);
-      
+
       if (subscribers === 0) {
-        this.logger.warn(`No subscribers for product event ${operation} on product ${eventData.id}`);
+        this.logger.warn(
+          `No subscribers for product event ${operation} on product ${eventData.id}`,
+        );
       }
     } catch (error: any) {
-      this.logger.error(`Failed to publish product event: ${error.message}`, error.stack);
+      this.logger.error(
+        `Failed to publish product event: ${error.message}`,
+        error.stack,
+      );
       throw error;
     }
   }
@@ -546,5 +638,4 @@ export class ProductsService implements OnModuleInit {
       .replace(/[^a-z0-9]+/g, '-')
       .replace(/(^-|-$)/g, '');
   }
-
 }

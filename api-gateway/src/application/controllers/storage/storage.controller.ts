@@ -1,9 +1,9 @@
-import { 
-  Controller, 
-  Get, 
-  Param, 
-  NotFoundException, 
-  HttpException, 
+import {
+  Controller,
+  Get,
+  Param,
+  NotFoundException,
+  HttpException,
   HttpStatus,
   StreamableFile,
   Header,
@@ -25,7 +25,10 @@ export class StorageController {
     private readonly httpService: HttpService,
     private readonly configService: ConfigService,
   ) {
-    this.laravelUrl = this.configService.get<string>('LARAVEL_URL', 'http://admin-service');
+    this.laravelUrl = this.configService.get<string>(
+      'LARAVEL_URL',
+      'http://admin-service',
+    );
   }
 
   @Public()
@@ -52,7 +55,10 @@ export class StorageController {
       if (error.response?.status === 404) {
         throw new NotFoundException('Image not found');
       }
-      throw new HttpException('Failed to fetch image', HttpStatus.INTERNAL_SERVER_ERROR);
+      throw new HttpException(
+        'Failed to fetch image',
+        HttpStatus.INTERNAL_SERVER_ERROR,
+      );
     }
   }
 
@@ -80,7 +86,10 @@ export class StorageController {
       if (error.response?.status === 404) {
         throw new NotFoundException('Product image not found');
       }
-      throw new HttpException('Failed to fetch product image', HttpStatus.INTERNAL_SERVER_ERROR);
+      throw new HttpException(
+        'Failed to fetch product image',
+        HttpStatus.INTERNAL_SERVER_ERROR,
+      );
     }
   }
 }

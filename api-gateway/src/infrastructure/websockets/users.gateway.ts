@@ -29,7 +29,7 @@ export class UsersGateway implements OnGatewayConnection {
     private readonly notificationsService: NotificationsService,
     private readonly notificationEventsService: NotificationEventsService,
   ) {
-     this.notificationEventsService.setBroadcastCallback((notification) => {
+    this.notificationEventsService.setBroadcastCallback((notification) => {
       this.broadcastNotification(notification);
     });
   }
@@ -71,7 +71,16 @@ export class UsersGateway implements OnGatewayConnection {
     }
   }
 
-  private async emitUsers(client: Socket, options: { search?: string; role?: string; limit?: number; offset?: number; withDeleted?: boolean }) {
+  private async emitUsers(
+    client: Socket,
+    options: {
+      search?: string;
+      role?: string;
+      limit?: number;
+      offset?: number;
+      withDeleted?: boolean;
+    },
+  ) {
     const result = await this.usersService.findAll(options);
     client.emit('users:list', result);
   }
@@ -90,9 +99,25 @@ export class UsersGateway implements OnGatewayConnection {
       withDeleted?: boolean;
     } = {},
   ) {
-    const { userId, status, fulfillmentStatus, orderNumber, page = 1, limit = 50, withDeleted } = payload;
+    const {
+      userId,
+      status,
+      fulfillmentStatus,
+      orderNumber,
+      page = 1,
+      limit = 50,
+      withDeleted,
+    } = payload;
     const offset = (page - 1) * limit;
-    await this.emitOrders(client, { userId, status, fulfillmentStatus, orderNumber, limit, offset, withDeleted });
+    await this.emitOrders(client, {
+      userId,
+      status,
+      fulfillmentStatus,
+      orderNumber,
+      limit,
+      offset,
+      withDeleted,
+    });
   }
 
   @SubscribeMessage('orders:getOne')
@@ -136,7 +161,11 @@ export class UsersGateway implements OnGatewayConnection {
   ) {
     const { status, fulfillmentStatus, page = 1, limit = 50 } = payload;
     const offset = (page - 1) * limit;
-    await this.emitOrders(client, { userId: user.id, status, fulfillmentStatus, limit, offset }, 'orders:myList');
+    await this.emitOrders(
+      client,
+      { userId: user.id, status, fulfillmentStatus, limit, offset },
+      'orders:myList',
+    );
   }
 
   private async emitOrders(
@@ -156,7 +185,12 @@ export class UsersGateway implements OnGatewayConnection {
       const result = await this.ordersService.findAll(options);
       client.emit(event, { success: true, ...result });
     } catch (error: any) {
-      client.emit(event, { success: false, error: error.message, data: [], total: 0 });
+      client.emit(event, {
+        success: false,
+        error: error.message,
+        data: [],
+        total: 0,
+      });
     }
   }
 
@@ -164,7 +198,7 @@ export class UsersGateway implements OnGatewayConnection {
     this.server.emit('orders:updated', order);
   }
 
-   @SubscribeMessage('notifications:get')
+  @SubscribeMessage('notifications:get')
   async handleNotificationsGet(
     @ConnectedSocket() client: Socket,
     @MessageBody()
@@ -184,7 +218,13 @@ export class UsersGateway implements OnGatewayConnection {
       });
       client.emit('notifications:list', { success: true, ...result });
     } catch (error: any) {
-      client.emit('notifications:list', { success: false, error: error.message, data: [], total: 0, unreadCount: 0 });
+      client.emit('notifications:list', {
+        success: false,
+        error: error.message,
+        data: [],
+        total: 0,
+        unreadCount: 0,
+      });
     }
   }
 
@@ -194,7 +234,11 @@ export class UsersGateway implements OnGatewayConnection {
       const unreadCount = await this.notificationsService.getUnreadCount();
       client.emit('notifications:unreadCount', { success: true, unreadCount });
     } catch (error: any) {
-      client.emit('notifications:unreadCount', { success: false, error: error.message, unreadCount: 0 });
+      client.emit('notifications:unreadCount', {
+        success: false,
+        error: error.message,
+        unreadCount: 0,
+      });
     }
   }
 
@@ -206,9 +250,16 @@ export class UsersGateway implements OnGatewayConnection {
     try {
       await this.notificationsService.markAsRead(payload.id);
       const unreadCount = await this.notificationsService.getUnreadCount();
-      client.emit('notifications:markedRead', { success: true, id: payload.id, unreadCount });
+      client.emit('notifications:markedRead', {
+        success: true,
+        id: payload.id,
+        unreadCount,
+      });
     } catch (error: any) {
-      client.emit('notifications:markedRead', { success: false, error: error.message });
+      client.emit('notifications:markedRead', {
+        success: false,
+        error: error.message,
+      });
     }
   }
 
@@ -216,14 +267,20 @@ export class UsersGateway implements OnGatewayConnection {
   async handleNotificationMarkAllRead(@ConnectedSocket() client: Socket) {
     try {
       const result = await this.notificationsService.markAllAsRead();
-      client.emit('notifications:allMarkedRead', { success: true, ...result, unreadCount: 0 });
+      client.emit('notifications:allMarkedRead', {
+        success: true,
+        ...result,
+        unreadCount: 0,
+      });
     } catch (error: any) {
-      client.emit('notifications:allMarkedRead', { success: false, error: error.message });
+      client.emit('notifications:allMarkedRead', {
+        success: false,
+        error: error.message,
+      });
     }
   }
 
-   broadcastNotification(notification: any) {
+  broadcastNotification(notification: any) {
     this.server.emit('notifications:new', notification);
   }
 }
-

@@ -1,4 +1,10 @@
-import { Injectable, Inject, Logger, OnModuleInit, OnModuleDestroy } from '@nestjs/common';
+import {
+  Injectable,
+  Inject,
+  Logger,
+  OnModuleInit,
+  OnModuleDestroy,
+} from '@nestjs/common';
 import { CACHE_MANAGER } from '@nestjs/cache-manager';
 import type { Cache } from 'cache-manager';
 import { ConfigService } from '@nestjs/config';
@@ -82,7 +88,10 @@ export class RedisService implements OnModuleInit, OnModuleDestroy {
     }
   }
 
-  async subscribe(channel: string, callback: (message: string) => void): Promise<void> {
+  async subscribe(
+    channel: string,
+    callback: (message: string) => void,
+  ): Promise<void> {
     try {
       await this.redisClient.subscribe(channel, (message) => {
         callback(message);
@@ -111,4 +120,3 @@ export class RedisService implements OnModuleInit, OnModuleDestroy {
     }
   }
 }
-

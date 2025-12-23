@@ -65,7 +65,10 @@ describe('NotificationsService', () => {
         { id: '2', title: 'Notification 2', userId: null },
       ];
 
-      mockQueryBuilder.getManyAndCount.mockResolvedValue([mockNotifications, 2]);
+      mockQueryBuilder.getManyAndCount.mockResolvedValue([
+        mockNotifications,
+        2,
+      ]);
       mockNotificationRepository.count.mockResolvedValue(1);
 
       const result = await service.findAllForAdmins({ limit: 10, offset: 0 });
@@ -86,7 +89,10 @@ describe('NotificationsService', () => {
 
       mockNotificationRepository.findOne
         .mockResolvedValueOnce(mockNotification as any)
-        .mockResolvedValueOnce({ ...mockNotification, readAt: new Date() } as any);
+        .mockResolvedValueOnce({
+          ...mockNotification,
+          readAt: new Date(),
+        } as any);
 
       mockHttpService.post.mockReturnValue(
         of({
@@ -110,7 +116,9 @@ describe('NotificationsService', () => {
     it('should throw NotFoundException if notification not found', async () => {
       mockNotificationRepository.findOne.mockResolvedValue(null);
 
-      await expect(service.markAsRead('invalid')).rejects.toThrow(NotFoundException);
+      await expect(service.markAsRead('invalid')).rejects.toThrow(
+        NotFoundException,
+      );
     });
   });
 

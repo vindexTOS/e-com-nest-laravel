@@ -1,4 +1,10 @@
-import { Injectable, Logger, OnModuleInit, Inject, forwardRef } from '@nestjs/common';
+import {
+  Injectable,
+  Logger,
+  OnModuleInit,
+  Inject,
+  forwardRef,
+} from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import Redis from 'ioredis';
 import { NotificationsService } from './notifications.service';
@@ -39,7 +45,9 @@ export class NotificationEventsService implements OnModuleInit {
       if (err) {
         this.logger.error('Failed to subscribe to notification-events:', err);
       } else {
-        this.logger.log(`Subscribed to notification-events channel (${count} channels)`);
+        this.logger.log(
+          `Subscribed to notification-events channel (${count} channels)`,
+        );
       }
     });
 
@@ -59,13 +67,19 @@ export class NotificationEventsService implements OnModuleInit {
     });
   }
 
-  private async handleNotificationEvent(event: { event: string; data: any; timestamp: string }): Promise<void> {
+  private async handleNotificationEvent(event: {
+    event: string;
+    data: any;
+    timestamp: string;
+  }): Promise<void> {
     this.logger.log(`Received notification event: ${event.event}`);
 
     if (event.event === 'notification.created') {
       // Sync the notification to the read database
       try {
-        const notification = await this.notificationsService.syncNotification(event.data);
+        const notification = await this.notificationsService.syncNotification(
+          event.data,
+        );
         this.logger.log(`Notification synced: ${notification.id}`);
 
         // Broadcast to WebSocket clients
@@ -85,4 +99,3 @@ export class NotificationEventsService implements OnModuleInit {
     }
   }
 }
-

@@ -5,7 +5,10 @@ export const ApiGetProfile = () =>
   applyDecorators(
     ApiBearerAuth(),
     ApiOperation({ summary: 'Get current user profile' }),
-    ApiResponse({ status: 200, description: 'User profile retrieved successfully' }),
+    ApiResponse({
+      status: 200,
+      description: 'User profile retrieved successfully',
+    }),
     ApiResponse({ status: 401, description: 'Unauthorized' }),
   );
 
@@ -15,6 +18,8 @@ export const ApiGetAllUsers = () =>
     ApiOperation({ summary: 'List all users (Admin only)' }),
     ApiResponse({ status: 200, description: 'Users retrieved successfully' }),
     ApiResponse({ status: 401, description: 'Unauthorized' }),
-    ApiResponse({ status: 403, description: 'Forbidden - Admin access required' }),
+    ApiResponse({
+      status: 403,
+      description: 'Forbidden - Admin access required',
+    }),
   );
-

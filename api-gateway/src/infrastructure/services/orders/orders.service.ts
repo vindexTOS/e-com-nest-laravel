@@ -1,4 +1,9 @@
-import { Injectable, NotFoundException, BadRequestException, Logger } from '@nestjs/common';
+import {
+  Injectable,
+  NotFoundException,
+  BadRequestException,
+  Logger,
+} from '@nestjs/common';
 import { InjectRepository, InjectDataSource } from '@nestjs/typeorm';
 import { Repository, DataSource, DeepPartial } from 'typeorm';
 import { Order } from '../../../domain/entities/order.entity';
@@ -141,7 +146,9 @@ export class OrdersService {
       });
 
       if (!user) {
-        throw new NotFoundException(`User with ID ${createOrderDto.userId} not found`);
+        throw new NotFoundException(
+          `User with ID ${createOrderDto.userId} not found`,
+        );
       }
 
       // Generate order number
@@ -157,7 +164,9 @@ export class OrdersService {
         });
 
         if (!product) {
-          throw new NotFoundException(`Product with ID ${item.productId} not found`);
+          throw new NotFoundException(
+            `Product with ID ${item.productId} not found`,
+          );
         }
 
         if (product.stock < item.quantity) {
@@ -208,7 +217,7 @@ export class OrdersService {
       order.paymentStatus = 'pending';
       order.notes = createOrderDto.notes || null;
 
-      const savedOrder = await queryRunner.manager.save(Order, order) as Order;
+      const savedOrder = await queryRunner.manager.save(Order, order);
 
       // Create order items
       for (const itemData of orderItems) {
@@ -235,7 +244,10 @@ export class OrdersService {
         },
       });
 
-      const savedNotification = await queryRunner.manager.save(Notification, notification);
+      const savedNotification = await queryRunner.manager.save(
+        Notification,
+        notification,
+      );
 
       // Reload order with relations from write DB before committing
       const freshOrder = await queryRunner.manager.findOne(Order, {
@@ -251,12 +263,16 @@ export class OrdersService {
 
       // Publish database events for sync (write → read DB)
       await this.publishDatabaseEvent('orders', 'INSERT', freshOrder);
-      
+
       for (const item of freshOrder.items) {
         await this.publishDatabaseEvent('order_items', 'INSERT', item);
       }
 
-      await this.publishDatabaseEvent('notifications', 'INSERT', savedNotification);
+      await this.publishDatabaseEvent(
+        'notifications',
+        'INSERT',
+        savedNotification,
+      );
 
       // Publish to order-events channel (for email)
       await this.publishOrderCreatedEvent(freshOrder, user);
@@ -286,10 +302,15 @@ export class OrdersService {
         try {
           await queryRunner.rollbackTransaction();
         } catch (rollbackError) {
-          this.logger.error(`Rollback failed: ${rollbackError instanceof Error ? rollbackError.message : rollbackError}`);
+          this.logger.error(
+            `Rollback failed: ${rollbackError instanceof Error ? rollbackError.message : rollbackError}`,
+          );
         }
       }
-      this.logger.error(`Failed to create order: ${error.message}`, error.stack);
+      this.logger.error(
+        `Failed to create order: ${error.message}`,
+        error.stack,
+      );
       throw error;
     } finally {
       await queryRunner.release();
@@ -298,11 +319,17 @@ export class OrdersService {
 
   private generateOrderNumber(): string {
     const timestamp = Date.now();
-    const random = Math.floor(Math.random() * 10000).toString().padStart(4, '0');
+    const random = Math.floor(Math.random() * 10000)
+      .toString()
+      .padStart(4, '0');
     return `ORD-${timestamp}-${random}`;
   }
 
-  private async publishDatabaseEvent(table: string, operation: 'INSERT' | 'UPDATE' | 'DELETE', data: any): Promise<void> {
+  private async publishDatabaseEvent(
+    table: string,
+    operation: 'INSERT' | 'UPDATE' | 'DELETE',
+    data: any,
+  ): Promise<void> {
     try {
       const eventData = {
         table,
@@ -314,14 +341,22 @@ export class OrdersService {
 
       const message = JSON.stringify(eventData);
       await this.redisService.publish('database:events', message);
-      
-      this.logger.log(`Published database event: ${operation} on ${table} (${data.id})`);
+
+      this.logger.log(
+        `Published database event: ${operation} on ${table} (${data.id})`,
+      );
     } catch (error: any) {
-      this.logger.error(`Failed to publish database event: ${error.message}`, error.stack);
+      this.logger.error(
+        `Failed to publish database event: ${error.message}`,
+        error.stack,
+      );
     }
   }
 
-  private async publishOrderCreatedEvent(order: Order, user: User): Promise<void> {
+  private async publishOrderCreatedEvent(
+    order: Order,
+    user: User,
+  ): Promise<void> {
     try {
       const eventData = {
         event: 'order.created',
@@ -344,18 +379,20 @@ export class OrdersService {
           payment_method: order.paymentMethod,
           payment_status: order.paymentStatus,
           notes: order.notes,
-          items: (order.items || []).map(item => ({
+          items: (order.items || []).map((item) => ({
             id: item.id,
             product_id: item.productId,
             product_name: item.productName,
             quantity: item.quantity,
             unit_price: item.unitPrice,
             total_price: item.totalPrice,
-            product: item.product ? {
-              id: item.product.id,
-              name: item.product.name,
-              price: item.product.price,
-            } : null,
+            product: item.product
+              ? {
+                  id: item.product.id,
+                  name: item.product.name,
+                  price: item.product.price,
+                }
+              : null,
           })),
           user: {
             id: user.id,
@@ -369,14 +406,22 @@ export class OrdersService {
         timestamp: new Date().toISOString(),
       };
 
-      await this.redisService.publish('order-events', JSON.stringify(eventData));
+      await this.redisService.publish(
+        'order-events',
+        JSON.stringify(eventData),
+      );
       this.logger.log(`Published order.created event for ${order.orderNumber}`);
     } catch (error: any) {
-      this.logger.error(`Failed to publish order.created event: ${error.message}`, error.stack);
+      this.logger.error(
+        `Failed to publish order.created event: ${error.message}`,
+        error.stack,
+      );
     }
   }
 
-  private async publishNotificationEvent(notification: Notification): Promise<void> {
+  private async publishNotificationEvent(
+    notification: Notification,
+  ): Promise<void> {
     try {
       const eventData = {
         event: 'notification.created',
@@ -394,10 +439,18 @@ export class OrdersService {
         timestamp: new Date().toISOString(),
       };
 
-      await this.redisService.publish('notification-events', JSON.stringify(eventData));
-      this.logger.log(`Published notification.created event for ${notification.id}`);
+      await this.redisService.publish(
+        'notification-events',
+        JSON.stringify(eventData),
+      );
+      this.logger.log(
+        `Published notification.created event for ${notification.id}`,
+      );
     } catch (error: any) {
-      this.logger.error(`Failed to publish notification event: ${error.message}`, error.stack);
+      this.logger.error(
+        `Failed to publish notification event: ${error.message}`,
+        error.stack,
+      );
     }
   }
 
@@ -456,4 +509,3 @@ export class OrdersService {
     return data;
   }
 }
-

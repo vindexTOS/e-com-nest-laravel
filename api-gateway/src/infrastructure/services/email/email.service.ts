@@ -28,13 +28,19 @@ export class EmailService implements OnModuleInit {
   constructor(private readonly configService: ConfigService) {}
 
   async onModuleInit() {
-    this.logger.log('EmailService initialized (MOCK MODE - emails will be logged only)');
+    this.logger.log(
+      'EmailService initialized (MOCK MODE - emails will be logged only)',
+    );
   }
 
   async sendOrderConfirmation(data: OrderConfirmationEmailData): Promise<void> {
-    this.logger.log('═══════════════════════════════════════════════════════════');
+    this.logger.log(
+      '═══════════════════════════════════════════════════════════',
+    );
     this.logger.log('📧 MOCK EMAIL - Order Confirmation');
-    this.logger.log('═══════════════════════════════════════════════════════════');
+    this.logger.log(
+      '═══════════════════════════════════════════════════════════',
+    );
     this.logger.log(`To: ${data.customerEmail}`);
     this.logger.log(`Subject: Order Confirmation - ${data.orderNumber}`);
     this.logger.log(`Customer: ${data.customerName}`);
@@ -49,28 +55,48 @@ export class EmailService implements OnModuleInit {
     if (data.shippingAddress) {
       this.logger.log(`Shipping Address: ${data.shippingAddress}`);
     }
-    this.logger.log('───────────────────────────────────────────────────────────');
+    this.logger.log(
+      '───────────────────────────────────────────────────────────',
+    );
     this.logger.log('Order Items:');
     data.items.forEach((item, index) => {
-      this.logger.log(`  ${index + 1}. ${item.name} x${item.quantity} @ $${item.price.toFixed(2)} = $${item.total.toFixed(2)}`);
+      this.logger.log(
+        `  ${index + 1}. ${item.name} x${item.quantity} @ $${item.price.toFixed(2)} = $${item.total.toFixed(2)}`,
+      );
     });
-    this.logger.log('───────────────────────────────────────────────────────────');
+    this.logger.log(
+      '───────────────────────────────────────────────────────────',
+    );
     this.logger.log('📧 Email content (HTML preview):');
-    this.logger.log(this.generateOrderConfirmationHTML(data).substring(0, 500) + '...');
-    this.logger.log('═══════════════════════════════════════════════════════════');
-    this.logger.log(`✅ MOCK: Order confirmation email would be sent to ${data.customerEmail}`);
-    this.logger.log('═══════════════════════════════════════════════════════════');
+    this.logger.log(
+      this.generateOrderConfirmationHTML(data).substring(0, 500) + '...',
+    );
+    this.logger.log(
+      '═══════════════════════════════════════════════════════════',
+    );
+    this.logger.log(
+      `✅ MOCK: Order confirmation email would be sent to ${data.customerEmail}`,
+    );
+    this.logger.log(
+      '═══════════════════════════════════════════════════════════',
+    );
   }
 
-  private generateOrderConfirmationHTML(data: OrderConfirmationEmailData): string {
-    const itemsHtml = data.items.map(item => `
+  private generateOrderConfirmationHTML(
+    data: OrderConfirmationEmailData,
+  ): string {
+    const itemsHtml = data.items
+      .map(
+        (item) => `
       <tr>
         <td style="padding: 12px; border-bottom: 1px solid #e9ecef;">${item.name}</td>
         <td style="padding: 12px; border-bottom: 1px solid #e9ecef; text-align: center;">${item.quantity}</td>
         <td style="padding: 12px; border-bottom: 1px solid #e9ecef; text-align: right;">$${item.price.toFixed(2)}</td>
         <td style="padding: 12px; border-bottom: 1px solid #e9ecef; text-align: right;">$${item.total.toFixed(2)}</td>
       </tr>
-    `).join('');
+    `,
+      )
+      .join('');
 
     return `
       <!DOCTYPE html>
@@ -205,12 +231,16 @@ export class EmailService implements OnModuleInit {
               <span>Shipping:</span>
               <span>$${data.shipping.toFixed(2)}</span>
             </div>
-            ${data.discount > 0 ? `
+            ${
+              data.discount > 0
+                ? `
             <div class="total-row">
               <span>Discount:</span>
               <span>-$${data.discount.toFixed(2)}</span>
             </div>
-            ` : ''}
+            `
+                : ''
+            }
             <div class="total-row">
               <span>Total:</span>
               <span>$${data.total.toFixed(2)}</span>
@@ -221,13 +251,13 @@ export class EmailService implements OnModuleInit {
           
           <div class="footer">
             <p>This is an automated email. Please do not reply to this message.</p>
-            <p>Sent on ${new Date().toLocaleString('en-US', { 
-              weekday: 'long', 
-              year: 'numeric', 
-              month: 'long', 
+            <p>Sent on ${new Date().toLocaleString('en-US', {
+              weekday: 'long',
+              year: 'numeric',
+              month: 'long',
               day: 'numeric',
               hour: '2-digit',
-              minute: '2-digit'
+              minute: '2-digit',
             })}</p>
           </div>
         </div>
@@ -236,10 +266,15 @@ export class EmailService implements OnModuleInit {
     `;
   }
 
-  private generateOrderConfirmationText(data: OrderConfirmationEmailData): string {
-    const itemsText = data.items.map(item => 
-      `${item.name} x${item.quantity} - $${item.price.toFixed(2)} each = $${item.total.toFixed(2)}`
-    ).join('\n');
+  private generateOrderConfirmationText(
+    data: OrderConfirmationEmailData,
+  ): string {
+    const itemsText = data.items
+      .map(
+        (item) =>
+          `${item.name} x${item.quantity} - $${item.price.toFixed(2)} each = $${item.total.toFixed(2)}`,
+      )
+      .join('\n');
 
     return `
 Order Confirmation
@@ -268,4 +303,3 @@ This is an automated email. Please do not reply to this message.
     `.trim();
   }
 }
-

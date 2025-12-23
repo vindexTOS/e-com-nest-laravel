@@ -1,4 +1,8 @@
-import { Injectable, UnauthorizedException, ConflictException } from '@nestjs/common';
+import {
+  Injectable,
+  UnauthorizedException,
+  ConflictException,
+} from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { JwtService } from '@nestjs/jwt';
@@ -19,7 +23,17 @@ export class AuthService {
     private redisService: RedisService,
   ) {}
 
-  async register(registerDto: RegisterDto): Promise<{ accessToken: string; refreshToken: string; user: { id: string; email: string; firstName: string; lastName: string; role: string } }> {
+  async register(registerDto: RegisterDto): Promise<{
+    accessToken: string;
+    refreshToken: string;
+    user: {
+      id: string;
+      email: string;
+      firstName: string;
+      lastName: string;
+      role: string;
+    };
+  }> {
     const existingUser = await this.userRepository.findOne({
       where: { email: registerDto.email },
     });
@@ -46,7 +60,17 @@ export class AuthService {
     return this.generateTokens(user);
   }
 
-  async login(loginDto: LoginDto): Promise<{ accessToken: string; refreshToken: string; user: { id: string; email: string; firstName: string; lastName: string; role: string } }> {
+  async login(loginDto: LoginDto): Promise<{
+    accessToken: string;
+    refreshToken: string;
+    user: {
+      id: string;
+      email: string;
+      firstName: string;
+      lastName: string;
+      role: string;
+    };
+  }> {
     const user = await this.userRepository.findOne({
       where: { email: loginDto.email },
     });
@@ -55,7 +79,10 @@ export class AuthService {
       throw new UnauthorizedException('Invalid credentials');
     }
 
-    const isPasswordValid = await bcrypt.compare(loginDto.password, user.password);
+    const isPasswordValid = await bcrypt.compare(
+      loginDto.password,
+      user.password,
+    );
     if (!isPasswordValid) {
       throw new UnauthorizedException('Invalid credentials');
     }
@@ -67,15 +94,22 @@ export class AuthService {
     return this.generateTokens(user);
   }
 
-  async refreshToken(refreshToken: string): Promise<{ accessToken: string; refreshToken: string }> {
+  async refreshToken(
+    refreshToken: string,
+  ): Promise<{ accessToken: string; refreshToken: string }> {
     try {
-      const jwtSecret = this.configService.get<string>('JWT_SECRET') || 'your-super-secret-jwt-key-change-in-production';
-      const refreshSecret = this.configService.get<string>('JWT_REFRESH_SECRET') || jwtSecret;
+      const jwtSecret =
+        this.configService.get<string>('JWT_SECRET') ||
+        'your-super-secret-jwt-key-change-in-production';
+      const refreshSecret =
+        this.configService.get<string>('JWT_REFRESH_SECRET') || jwtSecret;
       const payload = this.jwtService.verify<JwtPayload>(refreshToken, {
         secret: refreshSecret,
       });
 
-      const isBlacklisted = await this.redisService.get<boolean>(`blacklist:${refreshToken}`);
+      const isBlacklisted = await this.redisService.get<boolean>(
+        `blacklist:${refreshToken}`,
+      );
       if (isBlacklisted) {
         throw new UnauthorizedException('Token has been revoked');
       }
@@ -98,17 +132,32 @@ export class AuthService {
     }
   }
 
-  async generateTokens(user: User): Promise<{ accessToken: string; refreshToken: string; user: { id: string; email: string; firstName: string; lastName: string; role: string } }> {
+  async generateTokens(user: User): Promise<{
+    accessToken: string;
+    refreshToken: string;
+    user: {
+      id: string;
+      email: string;
+      firstName: string;
+      lastName: string;
+      role: string;
+    };
+  }> {
     const payload: JwtPayload = {
       sub: user.id,
       email: user.email,
       role: user.role,
     };
 
-    const jwtSecret = this.configService.get<string>('JWT_SECRET') || 'your-super-secret-jwt-key-change-in-production';
-    const refreshSecret = this.configService.get<string>('JWT_REFRESH_SECRET') || jwtSecret;
-    const accessTokenExpiration = this.configService.get<string>('JWT_EXPIRATION') || '1h';
-    const refreshTokenExpiration = this.configService.get<string>('JWT_REFRESH_EXPIRATION') || '7d';
+    const jwtSecret =
+      this.configService.get<string>('JWT_SECRET') ||
+      'your-super-secret-jwt-key-change-in-production';
+    const refreshSecret =
+      this.configService.get<string>('JWT_REFRESH_SECRET') || jwtSecret;
+    const accessTokenExpiration =
+      this.configService.get<string>('JWT_EXPIRATION') || '1h';
+    const refreshTokenExpiration =
+      this.configService.get<string>('JWT_REFRESH_EXPIRATION') || '7d';
 
     const [accessToken, refreshToken] = await Promise.all([
       this.jwtService.signAsync(payload, {
@@ -136,21 +185,33 @@ export class AuthService {
 
   async logout(accessToken: string, refreshToken?: string): Promise<void> {
     try {
-      const accessPayload = this.jwtService.decode(accessToken) as JwtPayload;
-      const accessExp = accessPayload.exp ? accessPayload.exp * 1000 : Date.now() + 3600000;
+      const accessPayload = this.jwtService.decode(accessToken);
+      const accessExp = accessPayload.exp
+        ? accessPayload.exp * 1000
+        : Date.now() + 3600000;
       const accessTtl = Math.floor((accessExp - Date.now()) / 1000);
 
       if (accessTtl > 0) {
-        await this.redisService.set(`blacklist:${accessToken}`, true, accessTtl);
+        await this.redisService.set(
+          `blacklist:${accessToken}`,
+          true,
+          accessTtl,
+        );
       }
 
       if (refreshToken) {
-        const refreshPayload = this.jwtService.decode(refreshToken) as JwtPayload;
-        const refreshExp = refreshPayload.exp ? refreshPayload.exp * 1000 : Date.now() + 604800000;
+        const refreshPayload = this.jwtService.decode(refreshToken);
+        const refreshExp = refreshPayload.exp
+          ? refreshPayload.exp * 1000
+          : Date.now() + 604800000;
         const refreshTtl = Math.floor((refreshExp - Date.now()) / 1000);
 
         if (refreshTtl > 0) {
-          await this.redisService.set(`blacklist:${refreshToken}`, true, refreshTtl);
+          await this.redisService.set(
+            `blacklist:${refreshToken}`,
+            true,
+            refreshTtl,
+          );
         }
       }
     } catch (error) {
@@ -158,4 +219,3 @@ export class AuthService {
     }
   }
 }
-

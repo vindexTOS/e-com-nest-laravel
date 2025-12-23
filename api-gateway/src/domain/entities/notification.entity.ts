@@ -42,4 +42,3 @@ export class Notification {
   @JoinColumn({ name: 'user_id' })
   user: User | null;
 }
-

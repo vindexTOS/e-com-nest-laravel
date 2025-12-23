@@ -1,5 +1,8 @@
 import { Resolver, Query, Args, ID } from '@nestjs/graphql';
-import { CategoryType, CategoriesPaginatedResponse } from '../../../domain/graphql/types/category.type';
+import {
+  CategoryType,
+  CategoriesPaginatedResponse,
+} from '../../../domain/graphql/types/category.type';
 import { CategoriesFilterInput } from '../../../domain/graphql/inputs/category.input';
 import { CategoriesService } from '../../../infrastructure/services/categories/categories.service';
 import { Public } from '../../../infrastructure/libs/decorators/public.decorator';
@@ -24,8 +27,9 @@ export class CategoryResolver {
 
   @Public()
   @Query(() => CategoryType, { name: 'category' })
-  async findOne(@Args('id', { type: () => ID }) id: string): Promise<CategoryType> {
+  async findOne(
+    @Args('id', { type: () => ID }) id: string,
+  ): Promise<CategoryType> {
     return this.categoriesService.findOne(id);
   }
 }
-

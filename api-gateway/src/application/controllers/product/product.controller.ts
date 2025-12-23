@@ -1,8 +1,24 @@
-import { Controller, Get, Query, Param, ParseIntPipe, DefaultValuePipe, Post, Put, Body, UseGuards } from '@nestjs/common';
+import {
+  Controller,
+  Get,
+  Query,
+  Param,
+  ParseIntPipe,
+  DefaultValuePipe,
+  Post,
+  Put,
+  Body,
+  UseGuards,
+} from '@nestjs/common';
 import { ProductsService } from '../../../infrastructure/services/products/products.service';
 import { Public } from '../../../infrastructure/libs/decorators/public.decorator';
 import { ApiController } from '../../../infrastructure/libs/swagger/api-docs.decorator';
-import { ApiOperation, ApiResponse, ApiTags, ApiBearerAuth } from '@nestjs/swagger';
+import {
+  ApiOperation,
+  ApiResponse,
+  ApiTags,
+  ApiBearerAuth,
+} from '@nestjs/swagger';
 import { CreateProductDto } from '../../../domain/dto/product/create-product.dto';
 import { UpdateProductDto } from '../../../domain/dto/product/update-product.dto';
 import { Roles } from '../../../infrastructure/libs/decorators/roles.decorator';
@@ -64,7 +80,10 @@ export class ProductController {
   @ApiResponse({ status: 201, description: 'Product created successfully' })
   @ApiResponse({ status: 400, description: 'Invalid input data' })
   @ApiResponse({ status: 401, description: 'Unauthorized' })
-  @ApiResponse({ status: 403, description: 'Forbidden - Admin access required' })
+  @ApiResponse({
+    status: 403,
+    description: 'Forbidden - Admin access required',
+  })
   async create(@Body() createProductDto: CreateProductDto) {
     return this.productsService.createProduct(createProductDto);
   }
@@ -77,11 +96,15 @@ export class ProductController {
   @ApiResponse({ status: 200, description: 'Product updated successfully' })
   @ApiResponse({ status: 400, description: 'Invalid input data' })
   @ApiResponse({ status: 401, description: 'Unauthorized' })
-  @ApiResponse({ status: 403, description: 'Forbidden - Admin access required' })
+  @ApiResponse({
+    status: 403,
+    description: 'Forbidden - Admin access required',
+  })
   @ApiResponse({ status: 404, description: 'Product not found' })
-  async update(@Param('id') id: string, @Body() updateProductDto: UpdateProductDto) {
+  async update(
+    @Param('id') id: string,
+    @Body() updateProductDto: UpdateProductDto,
+  ) {
     return this.productsService.updateProduct(id, updateProductDto);
   }
-
 }
-

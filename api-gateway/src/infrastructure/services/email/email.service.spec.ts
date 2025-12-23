@@ -31,9 +31,7 @@ describe('EmailService', () => {
         customerEmail: 'john@test.com',
         orderNumber: 'ORD-001',
         orderDate: '2024-01-01',
-        items: [
-          { name: 'Product 1', quantity: 2, price: 50, total: 100 },
-        ],
+        items: [{ name: 'Product 1', quantity: 2, price: 50, total: 100 }],
         subtotal: 100,
         tax: 10,
         shipping: 0,
@@ -41,7 +39,9 @@ describe('EmailService', () => {
         total: 110,
       };
 
-      const loggerSpy = jest.spyOn(service['logger'], 'log').mockImplementation();
+      const loggerSpy = jest
+        .spyOn(service['logger'], 'log')
+        .mockImplementation();
 
       await service.sendOrderConfirmation(emailData);
 

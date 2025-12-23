@@ -1,7 +1,10 @@
 import { Processor, Process } from '@nestjs/bull';
 import type { Job } from 'bull';
 import { Logger } from '@nestjs/common';
-import { EmailService, OrderConfirmationEmailData } from '../../services/email/email.service';
+import {
+  EmailService,
+  OrderConfirmationEmailData,
+} from '../../services/email/email.service';
 import type { SendOrderEmailJobData } from '../../../domain/dto/queue/send-order-email-job.dto';
 
 @Processor('email')
@@ -11,7 +14,9 @@ export class EmailQueueProcessor {
   constructor(private readonly emailService: EmailService) {}
 
   @Process('send-order-confirmation')
-  async handleOrderConfirmationEmail(job: Job<SendOrderEmailJobData>): Promise<void> {
+  async handleOrderConfirmationEmail(
+    job: Job<SendOrderEmailJobData>,
+  ): Promise<void> {
     const { data } = job;
 
     this.logger.log(
@@ -48,4 +53,3 @@ export class EmailQueueProcessor {
     }
   }
 }
-
