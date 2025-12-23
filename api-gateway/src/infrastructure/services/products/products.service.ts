@@ -312,28 +312,59 @@ export class ProductsService implements OnModuleInit {
       return this.getDeletedProducts({ search, categoryId, page, limit });
     }
 
-    await this.syncToElasticsearch();
+    if (search) {
+      await this.syncToElasticsearch();
+      const result = await this.elasticsearchService.searchProductsWithFilters({
+        search,
+        categoryId,
+        status,
+        page,
+        limit,
+      });
 
-    const [dbProducts, dbTotal] = await this.productRepository.findAndCount({
-      where: {
-        ...(status ? { status: status as any } : {}),
-        ...(categoryId ? { categoryId } : {}),
-      },
-      relations: ['category'],
-      take: limit,
-      skip: (page - 1) * limit,
-      order: { updatedAt: 'DESC' },
-    });
+      const productIds = result.hits.map((hit: any) => hit.id);
+      const products = await this.productRepository.find({
+        where: productIds.map((id: string) => ({ id })),
+        relations: ['category'],
+      });
 
-    const searchResult: SearchResult<any> = {
-      data: dbProducts,
-      total: dbTotal,
+      const productMap = new Map(products.map((p) => [p.id, p]));
+      const orderedProducts = productIds
+        .map((id: string) => productMap.get(id))
+        .filter((p) => p !== undefined);
+
+      return {
+        data: orderedProducts,
+        total: result.total,
+        page,
+        limit,
+        totalPages: Math.ceil(result.total / limit),
+      };
+    }
+
+    const query = this.productRepository.createQueryBuilder('product');
+    query.leftJoinAndSelect('product.category', 'category');
+
+    if (status) {
+      query.andWhere('product.status = :status', { status });
+    }
+
+    if (categoryId) {
+      query.andWhere('product.categoryId = :categoryId', { categoryId });
+    }
+
+    query.orderBy('product.updatedAt', 'DESC');
+
+    const total = await query.getCount();
+    const data = await query.skip((page - 1) * limit).take(limit).getMany();
+
+    return {
+      data,
+      total,
       page,
       limit,
-      totalPages: Math.ceil(dbTotal / limit),
+      totalPages: Math.ceil(total / limit),
     };
-
-    return searchResult;
   }
 
   async getDeletedProducts(params: {

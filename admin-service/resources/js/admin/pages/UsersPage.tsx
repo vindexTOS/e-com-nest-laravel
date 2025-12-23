@@ -50,10 +50,15 @@ const UsersPage: React.FC = () => {
             setLoading(false);
         };
 
+        const handleUsersUpdated = () => {
+            requestUsers();
+        };
+
         socket.on('connect', () => {
             requestUsers();
         });
         socket.on('users:list', handleUsersList);
+        socket.on('users:updated', handleUsersUpdated);
         socket.on('connect_error', (err) => {
             console.error('Socket connection error', err);
             setLoading(false);
@@ -61,6 +66,7 @@ const UsersPage: React.FC = () => {
 
         return () => {
             socket.off('users:list', handleUsersList);
+            socket.off('users:updated', handleUsersUpdated);
             socket.disconnect();
             socketRef.current = null;
         };

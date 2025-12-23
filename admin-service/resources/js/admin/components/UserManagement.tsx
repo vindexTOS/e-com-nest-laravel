@@ -1,10 +1,11 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { Table, Button, Space, Input, Select, Modal, Form, message, Tag, Popconfirm, Row, Col, Card, InputNumber, Switch } from 'antd';
 import { PlusOutlined, EditOutlined, DeleteOutlined, SearchOutlined, DatabaseOutlined } from '@ant-design/icons';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { nestjsUserApi } from '../../api';
 import { usersGql, seedersGql } from '../../graphql';
 import { User } from '../../types';
+import { io, Socket } from 'socket.io-client';
 const { Option } = Select;
 
 interface UserManagementProps {
@@ -24,6 +25,7 @@ const UserManagement: React.FC<UserManagementProps> = () => {
     const [pagination, setPagination] = useState({ current: 1, pageSize: 15, total: 0 });
     const [seeding, setSeeding] = useState(false);
     const [seedCount, setSeedCount] = useState(10);
+    const socketRef = useRef<Socket | null>(null);
 
     const usersQuery = useQuery({
         queryKey: ['users', 'management', filters, pagination.current, pagination.pageSize],
@@ -39,6 +41,35 @@ const UserManagement: React.FC<UserManagementProps> = () => {
     const users = usersQuery.data?.list || [];
     const loading = usersQuery.isFetching;
     const total = usersQuery.data?.total ?? pagination.total;
+
+    useEffect(() => {
+        const envUrl = (import.meta as any).env?.VITE_SOCKET_URL;
+        const defaultUrl = typeof window !== 'undefined' ? window.location.origin : 'http://localhost';
+        const socketUrl = (envUrl || defaultUrl).replace(/\/+$/, '');
+        const socket = io(`${socketUrl}/ws`, {
+            path: '/socket.io',
+            transports: ['websocket'],
+        });
+        socketRef.current = socket;
+
+        const handleUsersUpdated = () => {
+            queryClient.refetchQueries({ queryKey: ['users'] });
+        };
+
+        socket.on('connect', () => {
+            // Connection established
+        });
+        socket.on('users:updated', handleUsersUpdated);
+        socket.on('connect_error', (err) => {
+            console.error('Socket connection error', err);
+        });
+
+        return () => {
+            socket.off('users:updated', handleUsersUpdated);
+            socket.disconnect();
+            socketRef.current = null;
+        };
+    }, [queryClient]);
 
     const handleCreate = () => {
         setEditingUser(null);

@@ -6,8 +6,10 @@ import {
   ConnectedSocket,
   OnGatewayConnection,
 } from '@nestjs/websockets';
-import { UseGuards } from '@nestjs/common';
+import { UseGuards, Logger, OnModuleInit, OnModuleDestroy } from '@nestjs/common';
 import { Server, Socket } from 'socket.io';
+import { ConfigService } from '@nestjs/config';
+import Redis from 'ioredis';
 import { UsersService } from '../services/users/users.service';
 import { OrdersService } from '../services/orders/orders.service';
 import { NotificationsService } from '../services/notifications/notifications.service';
@@ -22,12 +24,17 @@ import { CurrentUserWs } from '../libs/decorators/current-user-ws.decorator';
     origin: '*',
   },
 })
-export class UsersGateway implements OnGatewayConnection {
+export class UsersGateway implements OnGatewayConnection, OnModuleInit, OnModuleDestroy {
+  private readonly logger = new Logger(UsersGateway.name);
+  private readonly EVENT_CHANNEL = 'database:events';
+  private subscriber: Redis;
+
   constructor(
     private readonly usersService: UsersService,
     private readonly ordersService: OrdersService,
     private readonly notificationsService: NotificationsService,
     private readonly notificationEventsService: NotificationEventsService,
+    private readonly configService: ConfigService,
   ) {
     this.notificationEventsService.setBroadcastCallback((notification) => {
       this.broadcastNotification(notification);
@@ -282,5 +289,74 @@ export class UsersGateway implements OnGatewayConnection {
 
   broadcastNotification(notification: any) {
     this.server.emit('notifications:new', notification);
+  }
+
+  async onModuleInit() {
+    await new Promise((resolve) => setTimeout(resolve, 10000));
+    await this.subscribeToUserEvents();
+    this.logger.log('UsersGateway initialized with Redis subscription');
+  }
+
+  async onModuleDestroy() {
+    if (this.subscriber) {
+      await this.subscriber.unsubscribe(this.EVENT_CHANNEL);
+      await this.subscriber.quit();
+    }
+  }
+
+  private async subscribeToUserEvents(): Promise<void> {
+    const redisHost = this.configService.get<string>('REDIS_HOST', 'redis');
+    const redisPort = this.configService.get<number>('REDIS_PORT', 6379);
+
+    this.subscriber = new Redis({
+      host: redisHost,
+      port: redisPort,
+      retryStrategy: (times) => {
+        const delay = Math.min(times * 50, 2000);
+        return delay;
+      },
+    });
+
+    this.subscriber.subscribe(this.EVENT_CHANNEL, (err, count) => {
+      if (err) {
+        this.logger.error(`Failed to subscribe to ${this.EVENT_CHANNEL}:`, err);
+      } else {
+        this.logger.log(
+          `Subscribed to ${this.EVENT_CHANNEL} channel (${count} channels)`,
+        );
+      }
+    });
+
+    this.subscriber.on('message', async (channel, message) => {
+      if (channel === this.EVENT_CHANNEL) {
+        await this.handleDatabaseEvent(message);
+      }
+    });
+
+    this.subscriber.on('error', (error) => {
+      this.logger.error('Redis subscriber error:', error);
+    });
+  }
+
+  private async handleDatabaseEvent(message: string): Promise<void> {
+    try {
+      const event = JSON.parse(message);
+      if (event.table === 'users' && (event.operation === 'INSERT' || event.operation === 'UPDATE' || event.operation === 'DELETE')) {
+        this.logger.log(
+          `Received user ${event.operation} event for user ${event.id}`,
+        );
+        await new Promise((resolve) => setTimeout(resolve, 300));
+        this.broadcastUserUpdate();
+      }
+    } catch (error: any) {
+      this.logger.error(
+        `Failed to handle database event: ${error.message}`,
+        error.stack,
+      );
+    }
+  }
+
+  broadcastUserUpdate() {
+    this.server.emit('users:updated');
   }
 }

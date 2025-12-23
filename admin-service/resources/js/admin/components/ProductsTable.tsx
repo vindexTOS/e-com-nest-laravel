@@ -1,19 +1,17 @@
 import React, { useState } from 'react';
-import { Layout, Table, Button, Space, Input, Select, Card, Modal, Form, Upload, message, Tag, Popconfirm, Row, Col, InputNumber } from 'antd';
+import { Table, Button, Space, Input, Select, Card, Modal, Form, Upload, message, Tag, Popconfirm, Row, Col, InputNumber } from 'antd';
 import { PlusOutlined, EditOutlined, DeleteOutlined, UndoOutlined, UploadOutlined, DownloadOutlined, SearchOutlined, DatabaseOutlined } from '@ant-design/icons';
 import { useMutation, useQuery, useQueryClient, keepPreviousData } from '@tanstack/react-query';
 import { nestjsProductsApi } from '../../api';
 import { productsGql, seedersGql, categoriesGql } from '../../graphql';
 import type { ProductListResponse } from '../../api/nestjs/products.api';
 import type { Product, Category } from '../../api';
-import AdminLayout from '../components/AdminLayout';
 import { getImageUrl } from '../../shared/utils/imageUtils';
 import { exportToCSV } from '../../shared/utils/exportUtils';
 
-const { Content } = Layout;
 const { Option } = Select;
 
-const ProductsPage: React.FC = () => {
+const ProductsTable: React.FC = () => {
     const queryClient = useQueryClient();
     const [modalVisible, setModalVisible] = useState(false);
     const [editingProduct, setEditingProduct] = useState<Product | null>(null);
@@ -57,7 +55,7 @@ const ProductsPage: React.FC = () => {
             setModalVisible(false);
             setEditingProduct(null);
             form.resetFields();
-            await delay(500); // wait for cross-service consistency (Laravel write, NestJS read)
+            await delay(500);
             await queryClient.refetchQueries({ queryKey: ['products'] });
         },
         onError: (error: any) => {
@@ -267,175 +265,173 @@ const ProductsPage: React.FC = () => {
     ];
 
     return (
-        <AdminLayout>
-            <Content style={{ padding: '24px', background: '#f0f2f5' }}>
-                <Card>
-                    <Row gutter={[16, 16]} style={{ marginBottom: 16 }}>
-                        <Col xs={24} sm={12} md={6}>
-                            <Input
-                                placeholder="Search products"
-                                prefix={<SearchOutlined />}
-                                value={filters.search}
-                                onChange={(e) => setFilters({ ...filters, search: e.target.value })}
-                                onPressEnter={() => productsQuery.refetch()}
-                            />
-                        </Col>
-                        <Col xs={24} sm={12} md={4}>
-                            <Select
-                                placeholder="Status"
-                                allowClear
-                                value={filters.status || undefined}
-                                onChange={(value) => {
-                                    setFilters({ ...filters, status: value || '' });
-                                    setPagination({ ...pagination, current: 1 });
-                                    productsQuery.refetch();
+        <>
+            <Card>
+                <Row gutter={[16, 16]} style={{ marginBottom: 16 }}>
+                    <Col xs={24} sm={12} md={6}>
+                        <Input
+                            placeholder="Search products"
+                            prefix={<SearchOutlined />}
+                            value={filters.search}
+                            onChange={(e) => setFilters({ ...filters, search: e.target.value })}
+                            onPressEnter={() => productsQuery.refetch()}
+                        />
+                    </Col>
+                    <Col xs={24} sm={12} md={4}>
+                        <Select
+                            placeholder="Status"
+                            allowClear
+                            value={filters.status || undefined}
+                            onChange={(value) => {
+                                setFilters({ ...filters, status: value || '' });
+                                setPagination({ ...pagination, current: 1 });
+                                productsQuery.refetch();
+                            }}
+                            style={{ width: '100%' }}
+                        >
+                            <Option value="active">Active</Option>
+                            <Option value="draft">Draft</Option>
+                            <Option value="archived">Archived</Option>
+                        </Select>
+                    </Col>
+                    <Col xs={24} sm={12} md={4}>
+                        <Select
+                            placeholder="Category"
+                            allowClear
+                            value={filters.category_id || undefined}
+                            onChange={(value) => {
+                                setFilters({ ...filters, category_id: value || '' });
+                                setPagination({ ...pagination, current: 1 });
+                                productsQuery.refetch();
+                            }}
+                            style={{ width: '100%' }}
+                        >
+                            {categories.map(cat => (
+                                <Option key={cat.id} value={cat.id}>{cat.name}</Option>
+                            ))}
+                        </Select>
+                    </Col>
+                    <Col xs={24} sm={12} md={10}>
+                        <Space>
+                            <Button type="primary" icon={<PlusOutlined />} onClick={handleCreate}>
+                                Add Product
+                            </Button>
+                            <Upload
+                                accept=".csv"
+                                beforeUpload={(file) => {
+                                    handleImport(file);
+                                    return false;
                                 }}
-                                style={{ width: '100%' }}
+                                showUploadList={false}
                             >
-                                <Option value="active">Active</Option>
-                                <Option value="draft">Draft</Option>
-                                <Option value="archived">Archived</Option>
-                            </Select>
-                        </Col>
-                        <Col xs={24} sm={12} md={4}>
-                            <Select
-                                placeholder="Category"
-                                allowClear
-                                value={filters.category_id || undefined}
-                                onChange={(value) => {
-                                    setFilters({ ...filters, category_id: value || '' });
-                                    setPagination({ ...pagination, current: 1 });
-                                    productsQuery.refetch();
-                                }}
-                                style={{ width: '100%' }}
-                            >
-                                {categories.map(cat => (
-                                    <Option key={cat.id} value={cat.id}>{cat.name}</Option>
-                                ))}
-                            </Select>
-                        </Col>
-                        <Col xs={24} sm={12} md={10}>
-                            <Space>
-                                <Button type="primary" icon={<PlusOutlined />} onClick={handleCreate}>
-                                    Add Product
-                                </Button>
-                                <Upload
-                                    accept=".csv"
-                                    beforeUpload={(file) => {
-                                        handleImport(file);
-                                        return false;
-                                    }}
-                                    showUploadList={false}
-                                >
-                                    <Button icon={<UploadOutlined />}>Import</Button>
-                                </Upload>
-                                <Button icon={<DownloadOutlined />} onClick={handleExport}>
-                                    Export
-                                </Button>
-                                <Button onClick={() => setFilters({ ...filters, trashed: !filters.trashed })}>
-                                    {filters.trashed ? 'Show Active' : 'Show Deleted'}
-                                </Button>
-                            </Space>
-                        </Col>
-                    </Row>
-
-                    <Row gutter={[16, 16]} style={{ marginBottom: 16 }}>
-                        <Col xs={24} sm={12} md={8}>
-                            <Space>
-                                <InputNumber
-                                    min={1}
-                                    max={1000}
-                                    value={seedCount}
-                                    onChange={(value) => setSeedCount(value || 10)}
-                                    style={{ width: 150 }}
-                                />
-                                <Button
-                                    icon={<DatabaseOutlined />}
-                                    loading={seeding}
-                                    onClick={handleSeed}
-                                >
-                                    Seed Products
-                                </Button>
-                            </Space>
-                        </Col>
-                    </Row>
-
-                    <Table
-                        columns={columns}
-                        dataSource={products}
-                        loading={loading}
-                        rowKey="id"
-                        pagination={{
-                            ...pagination,
-                            total,
-                            onChange: (page, pageSize) => setPagination({ ...pagination, current: page, pageSize }),
-                        }}
-                    />
-                </Card>
-
-                <Modal
-                    title={editingProduct ? 'Edit Product' : 'Create Product'}
-                    open={modalVisible}
-                    onCancel={() => {
-                        setModalVisible(false);
-                        form.resetFields();
-                    }}
-                    onOk={() => form.submit()}
-                    width={800}
-                >
-                    <Form form={form} layout="vertical" onFinish={handleSubmit}>
-                        <Form.Item name="name" label="Name" rules={[{ required: true }]}>
-                            <Input />
-                        </Form.Item>
-                        <Form.Item name="description" label="Description">
-                            <Input.TextArea rows={4} />
-                        </Form.Item>
-                        <Form.Item name="image" label="Image" valuePropName="file">
-                            <Upload listType="picture" beforeUpload={() => false}>
-                                <Button icon={<UploadOutlined />}>Upload</Button>
+                                <Button icon={<UploadOutlined />}>Import</Button>
                             </Upload>
-                        </Form.Item>
-                        <Row gutter={16}>
-                            <Col span={12}>
-                                <Form.Item name="sku" label="SKU" rules={[{ required: true }]}>
-                                    <Input />
-                                </Form.Item>
-                            </Col>
-                            <Col span={12}>
-                                <Form.Item name="price" label="Price" >
-                                    <Input type="number" step="0.01" />
-                                </Form.Item>
-                            </Col>
-                        </Row>
-                        <Row gutter={16}>
-                            <Col span={12}>
-                                <Form.Item name="stock" label="Stock"  >
-                                    <Input type="number" />
-                                </Form.Item>
-                            </Col> 
-                            <Col span={12}>
-                                <Form.Item name="status" label="Status">
-                                    <Select>
-                                        <Option value="draft">Draft</Option>
-                                        <Option value="active">Active</Option>
-                                        <Option value="archived">Archived</Option>
-                                    </Select>
-                                </Form.Item>
-                            </Col>
-                        </Row>
-                        <Form.Item name="category_id" label="Category">
-                            <Select allowClear>
-                                {categories.map(cat => (
-                                    <Option key={cat.id} value={cat.id}>{cat.name}</Option>
-                                ))}
-                            </Select>
-                        </Form.Item>
-                    </Form>
-                </Modal>
-            </Content>
-        </AdminLayout>
+                            <Button icon={<DownloadOutlined />} onClick={handleExport}>
+                                Export
+                            </Button>
+                            <Button onClick={() => setFilters({ ...filters, trashed: !filters.trashed })}>
+                                {filters.trashed ? 'Show Active' : 'Show Deleted'}
+                            </Button>
+                        </Space>
+                    </Col>
+                </Row>
+
+                <Row gutter={[16, 16]} style={{ marginBottom: 16 }}>
+                    <Col xs={24} sm={12} md={8}>
+                        <Space>
+                            <InputNumber
+                                min={1}
+                                max={1000}
+                                value={seedCount}
+                                onChange={(value) => setSeedCount(value || 10)}
+                                style={{ width: 150 }}
+                            />
+                            <Button
+                                icon={<DatabaseOutlined />}
+                                loading={seeding}
+                                onClick={handleSeed}
+                            >
+                                Seed Products
+                            </Button>
+                        </Space>
+                    </Col>
+                </Row>
+
+                <Table
+                    columns={columns}
+                    dataSource={products}
+                    loading={loading}
+                    rowKey="id"
+                    pagination={{
+                        ...pagination,
+                        total,
+                        onChange: (page, pageSize) => setPagination({ ...pagination, current: page, pageSize }),
+                    }}
+                />
+            </Card>
+
+            <Modal
+                title={editingProduct ? 'Edit Product' : 'Create Product'}
+                open={modalVisible}
+                onCancel={() => {
+                    setModalVisible(false);
+                    form.resetFields();
+                }}
+                onOk={() => form.submit()}
+                width={800}
+            >
+                <Form form={form} layout="vertical" onFinish={handleSubmit}>
+                    <Form.Item name="name" label="Name" rules={[{ required: true }]}>
+                        <Input />
+                    </Form.Item>
+                    <Form.Item name="description" label="Description">
+                        <Input.TextArea rows={4} />
+                    </Form.Item>
+                    <Form.Item name="image" label="Image" valuePropName="file">
+                        <Upload listType="picture" beforeUpload={() => false}>
+                            <Button icon={<UploadOutlined />}>Upload</Button>
+                        </Upload>
+                    </Form.Item>
+                    <Row gutter={16}>
+                        <Col span={12}>
+                            <Form.Item name="sku" label="SKU" rules={[{ required: true }]}>
+                                <Input />
+                            </Form.Item>
+                        </Col>
+                        <Col span={12}>
+                            <Form.Item name="price" label="Price" >
+                                <Input type="number" step="0.01" />
+                            </Form.Item>
+                        </Col>
+                    </Row>
+                    <Row gutter={16}>
+                        <Col span={12}>
+                            <Form.Item name="stock" label="Stock"  >
+                                <Input type="number" />
+                            </Form.Item>
+                        </Col> 
+                        <Col span={12}>
+                            <Form.Item name="status" label="Status">
+                                <Select>
+                                    <Option value="draft">Draft</Option>
+                                    <Option value="active">Active</Option>
+                                    <Option value="archived">Archived</Option>
+                                </Select>
+                            </Form.Item>
+                        </Col>
+                    </Row>
+                    <Form.Item name="category_id" label="Category">
+                        <Select allowClear>
+                            {categories.map(cat => (
+                                <Option key={cat.id} value={cat.id}>{cat.name}</Option>
+                            ))}
+                        </Select>
+                    </Form.Item>
+                </Form>
+            </Modal>
+        </>
     );
 };
 
-export default ProductsPage;
+export default ProductsTable;
 

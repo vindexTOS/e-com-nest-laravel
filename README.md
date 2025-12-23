@@ -42,6 +42,10 @@ cd e-com-nest-laravel
 docker compose up -d --build
 ```
 
+```
+It takes few seconds for nestjs API gateway to load, in this time nginx might return 502 gateway error 
+```
+
 Wait for all services to start (this may take a few minutes on first run).
 
 ### Step 2: Access the Application

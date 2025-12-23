@@ -3,7 +3,7 @@ import { Typography, Card, Row, Col, Statistic, Tabs } from 'antd';
 import { ShoppingOutlined, UserOutlined, DollarOutlined, ShoppingCartOutlined } from '@ant-design/icons';
 import { useQuery } from '@tanstack/react-query';
 import { nestjsProductsApi, nestjsOrdersApi, nestjsUserApi } from '../../api';
-import ProductManagement from '../components/ProductManagement';
+import ProductsTable from '../components/ProductsTable';
 import UserManagement from '../components/UserManagement';
 import CategoryManagement from '../components/CategoryManagement';
 import AdminLayout from '../components/AdminLayout';
@@ -41,7 +41,7 @@ const AdminDashboard: React.FC = () => {
         {
             key: 'products',
             label: 'Products',
-            children: <ProductManagement />,
+            children: <ProductsTable />,
         },
         {
             key: 'users',
